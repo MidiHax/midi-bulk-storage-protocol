@@ -27,6 +27,7 @@
   .keep { break-inside: avoid; }
   .rfc { font-variant: small-caps; font-weight: 700; letter-spacing: .02em; }
   a { color: inherit; text-decoration: none; }
+  a[href^="http"] { color: #1a4d8f; overflow-wrap: anywhere; }
 
   /* Page-number markers: used only while building the table of contents. */
   .mk { position: absolute; left: 0; top: 0; font-size: 2pt; color: #fff; white-space: nowrap; display: none; }
@@ -1030,11 +1031,11 @@
 <!-- ===================== Appendix B ===================== -->
 <section class="keep">
 <h2 id="sB"><span class="num">Appendix B</span>Reference Implementations</h2>
-<p>Three open implementations accompany this proposal. The first two were used to check every example and procedure in this document:</p>
+<p>Three open implementations accompany this proposal. The first two were used to check every example and procedure in this document. All three are published in one repository, <a href="https://github.com/MidiHax/midi-bulk-storage-protocol">github.com/MidiHax/midi-bulk-storage-protocol</a>, together with this document.</p>
 <ul>
-  <li><b>WebMIDI Server.</b> A complete MBSP Server that runs in a web browser using the Web MIDI API, with records kept in the browser's database, import and export of the whole database, a record browser, and a built-in protocol self-test.</li>
-  <li><b>Studio Client.</b> A test Client that emulates a studio of ten devices, including two units of the same model, and exercises every message, every Query filter, and the error cases (bad checksums, missing Blocks, Data Blocks for no open Store, lost final Status replies, replacement of stored Records, unknown Records, unknown Message Types, messages for other MUIDs, Server Names shared by two Servers, invalid fields and firmware refusal), verifying every reply byte for byte.</li>
-  <li><b>TouchOSC Snapshot Panel.</b> A small demonstration Client built as a TouchOSC control surface, with faders, knobs, an XY pad, toggles and a mode selector. Its Save button stores a snapshot of the controls on an MBSP Server, and its Load button lists the panel's snapshots and restores the one the user taps. It discovers every Server on the network and lets the user choose between them.</li>
+  <li><b>WebMIDI Server.</b> A complete MBSP Server that runs in a web browser using the Web MIDI API, with records kept in the browser's database, import and export of the whole database, a record browser, and a built-in protocol self-test. It can be run without installing anything at <a href="https://midihax.github.io/midi-bulk-storage-protocol/sample-server/">midihax.github.io/midi-bulk-storage-protocol/sample-server/</a>.<br>Source: <a href="https://github.com/MidiHax/midi-bulk-storage-protocol/tree/main/sample-server">github.com/MidiHax/midi-bulk-storage-protocol/tree/main/sample-server</a></li>
+  <li><b>Studio Client.</b> A test Client that emulates a studio of ten devices, including two units of the same model, and exercises every message, every Query filter, and the error cases (bad checksums, missing Blocks, Data Blocks for no open Store, lost final Status replies, replacement of stored Records, unknown Records, unknown Message Types, messages for other MUIDs, Server Names shared by two Servers, invalid fields and firmware refusal), verifying every reply byte for byte.<br>Source: <a href="https://github.com/MidiHax/midi-bulk-storage-protocol/tree/main/sample-client">github.com/MidiHax/midi-bulk-storage-protocol/tree/main/sample-client</a></li>
+  <li><b>TouchOSC Snapshot Panel.</b> A small demonstration Client built as a TouchOSC control surface, with faders, knobs, an XY pad, toggles and a mode selector. Its Save button stores a snapshot of the controls on an MBSP Server, and its Load button lists the panel's snapshots and restores the one the user taps. It discovers every Server on the network and lets the user choose between them.<br>Source: <a href="https://github.com/MidiHax/midi-bulk-storage-protocol/tree/main/touchosc-panel">github.com/MidiHax/midi-bulk-storage-protocol/tree/main/touchosc-panel</a></li>
 </ul>
 <p>The Server and the Studio Client share one protocol codec. In testing over a MIDI loopback, the Client completed more than 450 randomized operations against the Server, with up to six devices active at once, without a protocol error. The TouchOSC panel was tested live with two Servers on the network, discovering both and saving to and restoring from the one selected. In automated tests it also ran against two Servers at once, storing on each separately.</p>
 </section>
