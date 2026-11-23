@@ -1,0 +1,13 @@
+# Working notes and reviews: kept locally, never published
+analysis/
+
+# Dependencies
+node_modules/
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBSP Browser Tests</title>
+<style>
+  body { margin: 0; padding: 16px; background: #0b0f10; color: #d6e2e4; font: 13px/1.5 ui-monospace, Consolas, monospace; }
+  .pass { color: #7fe0c0; } .fail { color: #ff5a6a; }
+</style>
+</head>
+<body>
+<p>Tests the IndexedDB store and the server against it (Node can't), then runs the protocol self-test. Uses a throwaway database.</p>
+<pre id="out">running...</pre>
+<script src="../js/mbsp-protocol.js"></script>
+<script src="../js/mbsp-store.js"></script>
+<script src="../js/mbsp-file.js"></script>
+<script src="../js/mbsp-server.js"></script>
+<script src="../js/mbsp-selftest.js"></script>
+<script>
+(async () => {
+  const outEl = document.getElementById('out');
+  const lines = [];
+  let failed = 0;
+  const show = () => { outEl.innerHTML = lines.join('\n') + `\n\nRESULT: ${failed ? failed + ' FAILED' : 'ALL PASSED'}`; };
+  const check = (name, ok, detail = '') => {
+    if (!ok) failed++;
+    lines.push(`<span class="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'}</span>  ${name}${detail ? '  (' + detail + ')' : ''}`);
+    show();
+  };
+
+  const dbName = 'mbsp-browser-test-' + Date.now();
+  try {
+    const s = await new MBSP.IndexedDbStore(dbName).open();
+    const inbox = [];
+    const srv = new MBSP.MbspServer({ store: s, send: b => inbox.push(MBSP.decodeMessage(b)), settings: { serverName: 'IdbTest', blockDelayMs: 0 } });
+    const B = MBSP.build, M = MBSP.MSG;
+    const enc = (type, payload, tid) => MBSP.encodeMessage({ type, src: 1234, dst: type === M.DISCOVER_SERVERS ? MBSP.MUID_BROADCAST : srv.muid, tid, payload });
+    const payload = Uint8Array.from({ length: 700 }, (_, i) => i & 0x7F);
+
+    await srv.handleMessage(enc(M.STORE_HEADER, B.storeHeader({ identity: [1, 0, 0, 1, 0, 1, 0], deviceName: 'Dev', sysexId: 0,
+      type: 1, number: 'A1', name: 'Idb Patch', tags: ['x'], size: payload.length, numBlocks: 2, checksum: MBSP.crc32(payload) }), 1));
+    await srv.handleMessage(enc(M.STORE_DATA_BLOCK, B.dataBlock({ blockIndex: 0, data: payload.subarray(0, 400) }), 1));
+    await srv.handleMessage(enc(M.STORE_DATA_BLOCK, B.dataBlock({ blockIndex: 1, data: payload.subarray(400) }), 1));
+    const stMsg = inbox.filter(m => m.type === M.STATUS);
+    const st = MBSP.parse.status(new MBSP.Reader(stMsg[0].payload));
+    check('Store into IndexedDB', st.status === MBSP.STATUS.OK && st.recordId === 1, `${MBSP.STATUS_NAME[st.status]} id ${st.recordId}`);
+
+    const list = await s.list();
+    check('list() returns metadata with size', list.length === 1 && list[0].size === 700 && list[0].name === 'Idb Patch');
+    check('Next ID advanced', (await s.getNextId()) === 2);
+    const p = await s.getPayload(1);
+    check('Payload bytes round-trip', p && p.length === 700 && p.every((v, i) => v === payload[i]));
+
+    /** Retrieve with flow control: ack the header and every block. Returns { header, data, names }. */
+    async function retrieve(recordId, tid) {
+      inbox.length = 0;
+      await srv.handleMessage(enc(M.RETRIEVE_REQUEST, B.retrieveRequest({ recordId }), tid));
+      const header = MBSP.parse.retrieveHeader(new MBSP.Reader(inbox[0].payload));
+      const parts = [], names = new Set();
+      for (let i = 0; i <= header.numBlocks; i++) {
+        inbox.length = 0;
+        await srv.handleMessage(enc(M.RETRIEVE_BLOCK_ACK, B.blockAck({ nextBlock: i }), tid));
+        if (i < header.numBlocks) { const b = MBSP.parse.dataBlock(new MBSP.Reader(inbox[0].payload)); parts.push(...b.data); names.add(inbox[0].src === srv.muid ? 'server' : 'other'); }
+      }
+      return { header, data: Uint8Array.from(parts), names };
+    }
+    const rt = await retrieve(1, 2);
+    check('Retrieve from IndexedDB: 3 blocks, CRC-32, sent from the server MUID', rt.header.numBlocks === 3 && rt.data.length === 700 &&
+      MBSP.crc32(rt.data) === rt.header.checksum && [...rt.names].join() === 'server', `${rt.header.numBlocks} block(s)`);
+
+    // A record saved before the CRC-32 change has no crc32: the server computes it on Retrieve.
+    const legacy = list[0]; delete legacy.crc32; legacy.checksum = 0x12;
+    const ltx = s.db.transaction('records', 'readwrite'); ltx.objectStore('records').put(legacy);
+    await new Promise(r => { ltx.oncomplete = r; });
+    const lr = await retrieve(1, 3);
+    check('Older record without a stored CRC-32 is served with a computed one', lr.header.checksum === MBSP.crc32(payload));
+
+    const np = Uint8Array.from({ length: 300 }, (_, i) => (i * 3) & 0x7F);
+    const ok = await s.replace(1, { ...list[0], name: 'Replaced', crc32: MBSP.crc32(np) }, np);
+    const after = await s.get(1), ap = await s.getPayload(1);
+    check('IndexedDB replace() keeps the ID and swaps metadata + payload', ok && after.name === 'Replaced' && after.size === 300 && ap.length === 300 && (await s.list()).length === 1);
+    check('IndexedDB replace() of a missing record returns false', (await s.replace(999, list[0], np)) === false && !(await s.get(999)));
+
+    const free = await s.freeSpace();
+    check('freeSpace() from the storage estimate', free === null || (Number.isFinite(free) && free >= 0), String(free));
+    inbox.length = 0;
+    await srv.handleMessage(enc(M.DISCOVER_SERVERS, B.discoverServers(), 4));
+    const on = MBSP.parse.onlineServer(new MBSP.Reader(inbox[0].payload));
+    check('OnlineServer reports Free Space', free === null ? on.freeSpace === MBSP.LIMITS.FREE_SPACE_UNKNOWN : on.freeSpace === Math.min(free, MBSP.LIMITS.FREE_SPACE_UNKNOWN), String(on.freeSpace));
+
+    const file = MBSP.encodeDatabaseFile({ serverName: 'IdbTest', nextRecordId: await s.getNextId(), entries: await MBSP.readAll(s) });
+    const db = MBSP.decodeDatabaseFile(file);
+    await MBSP.importEntries(s, db.entries, db.nextRecordId, 'merge');
+    check('Import merge adds a new ID', (await s.list()).map(r => r.id).join() === '1,2');
+    await MBSP.importEntries(s, db.entries, db.nextRecordId, 'replace');
+    check('Import replace restores IDs; the Record ID counter never goes back', (await s.list()).map(r => r.id).join() === '1' && (await s.getNextId()) === 3);
+    check('remove() existing / missing', (await s.remove(1)) === true && (await s.remove(1)) === false);
+    await s.clear();
+    check('clear() deletes every Record but keeps the Record ID counter', (await s.list()).length === 0 && (await s.getNextId()) === 3);
+    srv.shutdown();
+    s.db.close();
+    indexedDB.deleteDatabase(dbName);
+
+    const r = await MBSP.runSelfTest({});
+    for (const t of r.results) check('[self-test] ' + t.name, t.ok, t.error);
+  } catch (e) {
+    check('Unexpected error', false, e && e.stack);
+  }
+  show();
+  document.title = failed ? 'MBSP tests FAILED' : 'MBSP tests passed';
+})();
+</script>
+</body>
+</html>

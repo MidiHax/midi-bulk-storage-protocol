@@ -1,0 +1,13 @@
+{
+  "name": "mbsp-touchosc-panel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TouchOSC demo panel that saves and restores control snapshots on MBSP servers",
+  "scripts": {
+    "build": "node build-panel.js",
+    "test": "node build-panel.js && node test/run-panel-test.js"
+  },
+  "devDependencies": {
+    "fengari": "0.1.4"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "mbsp-sample-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Emulates a studio of 10 MIDI devices that exercise an MBSP server over MIDI",
+  "main": "mbsp-studio.js",
+  "scripts": {
+    "start": "node mbsp-studio.js",
+    "ports": "node mbsp-studio.js --list"
+  },
+  "dependencies": {
+    "@julusian/midi": "^3.9.0"
+  }
+}

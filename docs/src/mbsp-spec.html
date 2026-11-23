@@ -1,0 +1,1134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MIDI Bulk Storage Protocol (MBSP) Specification, Version 1.0 Draft 2</title>
+<meta name="description" content="Draft specification of the MIDI Bulk Storage Protocol, proposed to the MIDI Manufacturers Association.">
+<style>
+  @page { size: Letter; margin: 0.95in 0.9in 0.9in 0.9in; }
+  :root {
+    --ink: #1a1a1a; --ink-2: #444; --ink-3: #6a6a6a; --rule: #b9b9b9; --rule-lt: #dedede;
+    --shade: #f2f2f2; --shade-2: #e8e8e8; --accent: #1d4f7a;
+  }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; color: var(--ink); background: #fff; font: 10.5pt/1.45 Cambria, Georgia, "Times New Roman", serif; }
+  h1, h2, h3, h4, .sans { font-family: "Segoe UI", Arial, Helvetica, sans-serif; }
+  h2, h3, h4 { position: relative; break-after: avoid; color: var(--ink); }
+  h2 { font-size: 16pt; margin: 26pt 0 10pt; padding-bottom: 4pt; border-bottom: 1.5pt solid var(--accent); }
+  h3 { font-size: 12pt; margin: 16pt 0 6pt; }
+  h4 { font-size: 10.5pt; margin: 12pt 0 4pt; }
+  h2 .num, h3 .num, h4 .num { color: var(--accent); margin-right: 8pt; }
+  p { margin: 0 0 7pt; text-align: left; orphans: 3; widows: 3; }
+  ul, ol { margin: 0 0 8pt; padding-left: 20pt; }
+  li { margin-bottom: 3pt; }
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 9.2pt; }
+  .chapter { break-before: page; }
+  .chapter > h2:first-child, .titlepage + .front > h2:first-child { margin-top: 0; }
+  .keep { break-inside: avoid; }
+  .rfc { font-variant: small-caps; font-weight: 700; letter-spacing: .02em; }
+  a { color: inherit; text-decoration: none; }
+
+  /* Page-number markers: used only while building the table of contents. */
+  .mk { position: absolute; left: 0; top: 0; font-size: 2pt; color: #fff; white-space: nowrap; display: none; }
+  body.markers .mk { display: inline; }
+
+  /* Title page */
+  .titlepage { height: 8.9in; display: flex; flex-direction: column; break-after: page; }
+  .titlepage .band { border-top: 5pt solid var(--accent); padding-top: 14pt; }
+  .titlepage .org { font: 600 10pt "Segoe UI", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+  .titlepage h1 { font-size: 30pt; line-height: 1.1; margin: 1.6in 0 8pt; color: var(--ink); }
+  .titlepage .subtitle { font: 400 15pt "Segoe UI", Arial, sans-serif; color: var(--ink-2); margin-bottom: 4pt; }
+  .titlepage .version { font: 600 12pt "Segoe UI", Arial, sans-serif; color: var(--accent); margin-top: 18pt; }
+  .titlepage .status-box { margin-top: auto; border: 1pt solid var(--rule); padding: 10pt 12pt; font-size: 9.5pt; }
+  .titlepage dl { display: grid; grid-template-columns: max-content 1fr; gap: 3pt 14pt; margin: 0 0 8pt; }
+  .titlepage dt { font: 600 9pt "Segoe UI", Arial, sans-serif; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; padding-top: 1pt; }
+  .titlepage dd { margin: 0; }
+  .placeholder { background: #fff3c4; padding: 0 3pt; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.4pt; line-height: 1.35; }
+  caption { caption-side: top; text-align: left; font: 600 9pt "Segoe UI", Arial, sans-serif; color: var(--ink-2); padding-bottom: 4pt; }
+  th { font: 600 8.6pt "Segoe UI", Arial, sans-serif; text-align: left; background: var(--shade-2); border: .75pt solid var(--rule); padding: 3pt 5pt; vertical-align: bottom; }
+  td { border: .75pt solid var(--rule); padding: 3pt 5pt; vertical-align: top; }
+  tr { break-inside: avoid; }
+  td.c, th.c { text-align: center; }
+  td.mono, td code { white-space: nowrap; }
+  tr.sub td { background: #fafafa; }
+  tr.sub td:first-child { padding-left: 16pt; }
+  .fields td:nth-child(2), .fields td:nth-child(3) { white-space: nowrap; }
+
+  /* Boxes */
+  .note { border-left: 3pt solid var(--rule); background: var(--shade); padding: 6pt 9pt; margin: 6pt 0 10pt; font-size: 9.8pt; break-inside: avoid; }
+  .note b:first-child { font-family: "Segoe UI", Arial, sans-serif; font-size: 8.8pt; text-transform: uppercase; letter-spacing: .06em; margin-right: 4pt; }
+  .issue { border-left-color: #b07a00; background: #fff8e6; }
+  pre.bytes { font: 9pt/1.5 Consolas, "Courier New", monospace; background: var(--shade); border: .75pt solid var(--rule-lt); padding: 6pt 8pt; white-space: pre-wrap; overflow-wrap: normal; word-break: normal; margin: 4pt 0 10pt; break-inside: avoid; }
+  .req { margin: 0 0 6pt; padding-left: 0; list-style: none; }
+  .req li { display: grid; grid-template-columns: 52pt 1fr; gap: 6pt; margin-bottom: 4pt; break-inside: avoid; }
+  .req .id { font: 600 8.6pt "Segoe UI", Arial, sans-serif; color: var(--accent); padding-top: 1.5pt; }
+
+  /* Table of contents */
+  .toc { break-after: page; }
+  .toc ol { list-style: none; padding: 0; margin: 0; }
+  .toc li { margin: 0; }
+  .toc a { display: flex; align-items: baseline; gap: 6pt; padding: .5pt 0; }
+  .toc .lvl1 > a { font: 600 10pt "Segoe UI", Arial, sans-serif; margin-top: 4pt; }
+  .toc .lvl2 > a { padding-left: 22pt; font-size: 9.6pt; }
+  .toc .t { flex: 0 1 auto; }
+  .toc .dots { flex: 1 1 auto; border-bottom: 1pt dotted #999; transform: translateY(-3pt); min-width: 12pt; }
+  .toc .pg { flex: none; font-variant-numeric: tabular-nums; min-width: 16pt; text-align: right; }
+
+  /* Diagrams */
+  figure { margin: 8pt 0 12pt; break-inside: avoid; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { font: 600 9pt "Segoe UI", Arial, sans-serif; color: var(--ink-2); margin-top: 4pt; }
+  .front h2 { border-bottom-width: 1pt; }
+</style>
+</head>
+<body>
+
+<!-- ===================== Title page ===================== -->
+<section class="titlepage">
+  <div class="band"><div class="org">Draft proposal for consideration by the MIDI Manufacturers Association</div></div>
+  <h1>MIDI Bulk Storage Protocol<br>(MBSP)</h1>
+  <div class="subtitle">A protocol for MIDI devices to store, query, retrieve and delete their own bulk data on a storage server over MIDI System Exclusive</div>
+  <div class="version">Specification, Version 1.0 &middot; Draft 2</div>
+  <div class="status-box">
+    <dl>
+      <dt>Document</dt><dd>MBSP-1.0-D2</dd>
+      <dt>Date</dt><dd>November 23, 2026</dd>
+      <dt>Status</dt><dd>Draft proposal. Not an adopted MMA or AMEI specification.</dd>
+      <dt>Proposed by</dt><dd>Derek Jeter, <a href="mailto:dcjeter@gmail.com">dcjeter@gmail.com</a></dd>
+      <dt>Submitted to</dt><dd>The MIDI Manufacturers Association (MMA) / The MIDI Association, for review and possible joint adoption with the Association of Musical Electronics Industry (AMEI)</dd>
+    </dl>
+    This document proposes a new protocol carried in Universal Non-Real Time System Exclusive messages. The Sub-ID value used throughout (6Ah) is a placeholder pending assignment by the MMA and AMEI and must not be used in shipping products.
+  </div>
+</section>
+
+<!-- ===================== Front matter ===================== -->
+<section class="front">
+  <h2>Abstract</h2>
+  <p>The MIDI Bulk Storage Protocol (MBSP) lets any MIDI device save and recall its own bulk data, such as patches, banks, performances, drum kits, sequences, tunings and calibration data, on a storage Server reachable over an ordinary MIDI connection. The device itself initiates every operation, so no instrument-specific librarian software is needed: one MBSP Server can serve every MBSP-capable device in a studio.</p>
+  <p>MBSP is carried entirely in Universal Non-Real Time System Exclusive messages and works over MIDI 1.0 DIN, USB MIDI and any transport that carries MIDI 1.0 System Exclusive, including MIDI 2.0 UMP Data 64 messages. It defines server discovery, acknowledged block-by-block transfer with checksums and recovery of lost messages, server-assigned record identifiers, atomic replacement of stored records, filtered and paged queries, owner-checked deletion and a classification of bulk data types. The protocol is stateless between transactions and needs only a small amount of memory in the device.</p>
+
+  <h2>Status of This Document</h2>
+  <p>This is a draft proposal submitted for review. It has not been adopted by the MMA or AMEI and may change substantially. Section 12 lists open issues on which the proposer specifically requests the reviewers' guidance. Working reference implementations of a Server, a test Client and a demonstration Client accompany this proposal (Appendix B).</p>
+
+  <h2>Revision History</h2>
+  <table>
+    <thead><tr><th style="width:18%">Version</th><th style="width:20%">Date</th><th>Changes</th></tr></thead>
+    <tbody>
+      <tr><td>1.0 Draft 1</td><td>2026-11-22</td><td>First draft for MMA review.</td></tr>
+      <tr><td>1.0 Draft 2</td><td>2026-11-23</td><td>Clarifications from pre-submission review: two-way MIDI connection and discovery scope, network figure, announcements exempt from C-2, ascending Record IDs, Payload Size field added to Store_Header and Retrieve_Header, Block-count rules, Access Key comparison, MIDI-CI MUID rule, empty Payloads, concurrent replacements, conformance summary, abbreviations, Open Issues 2-4.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ===================== Table of contents ===================== -->
+<section class="toc chapter" id="toc">
+  <h2>Contents</h2>
+  <ol id="tocList"></ol>
+</section>
+
+<!-- ===================== 1 Introduction ===================== -->
+<section class="chapter">
+<h2 id="s1"><span class="num">1</span>Introduction</h2>
+
+<h3 id="s1-1"><span class="num">1.1</span>Purpose</h3>
+<p>This specification defines the MIDI Bulk Storage Protocol (MBSP): the messages, data structures and procedures that let a MIDI device (the Client) store its bulk data on, and recall it from, a storage device (the Server) over a MIDI connection.</p>
+
+<h3 id="s1-2"><span class="num">1.2</span>Background and Motivation</h3>
+<p>MIDI instruments have long been able to dump and reload their internal data using manufacturer-specific System Exclusive messages. In practice, saving and restoring that data needs one of three things: "librarian" software running on a computer, which must understand the proprietary format of every instrument it supports; a generic System Exclusive utility, such as MIDI-OX, that records and replays dumps without understanding them; or a dedicated hardware data filer. All three have drawbacks:</p>
+<ul>
+  <li>A typical studio needs several separate librarian applications, each written for particular instruments, and many instruments have no librarian at all.</li>
+  <li>Generic System Exclusive utilities work with any instrument, but leave the user with a growing collection of .syx and Standard MIDI Files scattered across a computer's file system. The files carry no reliable record of which instrument, model or unit they came from, or of what they contain beyond whatever the user typed into the file name. Finding a particular patch means opening files one by one, and organizing, backing up and restoring them is manual and error-prone.</li>
+  <li>Librarians and generic utilities both depend on a computer, which conflicts with the growing number of computer-free ("DAWless") studios and live rigs.</li>
+  <li>Hardware data filers, once common, are now rare, and each instrument must still be operated by hand to send or request a dump.</li>
+</ul>
+<p>MBSP reverses the relationship. The instrument, which already understands its own data, takes responsibility for saving and restoring it, and the storage device becomes a simple, unattended, instrument-agnostic service. The Server never needs to interpret the data it stores, yet every Record carries the metadata that loose dump files lack: the device it came from, its slot number and name, its kind, and the user's tags. A Client can therefore search a Server for exactly what it needs. Any device that implements MBSP can use any MBSP Server, whether it is a computer application, a dedicated hardware box, a feature of a MIDI interface, or a web page.</p>
+
+<h4 id="s1-2-1"><span class="num">1.2.1</span>Why Now?</h4>
+<p>Manufacturer-specific bulk dumps are a long-established practice, and the large installed base of MIDI devices will not use MBSP unless their firmware or software is updated. MBSP is therefore aimed mainly at devices still to come. Two current trends make this the right time to define it:</p>
+<ul>
+  <li><b>Low-cost instruments.</b> A growing number of inexpensive instruments are built on resource-constrained hardware, with little room to store patches and rarely any librarian software.</li>
+  <li><b>Replacement and enhanced firmware.</b> It has become far easier for individuals and small teams, increasingly with the help of AI coding tools, to write new or improved firmware. This is happening especially for low-cost instruments, and for vintage units whose original storage is severely limited.</li>
+</ul>
+<p>Both kinds of device need somewhere to keep their data. Defining a standard mechanism now, carried in the System Exclusive messages that every MIDI device already supports, lets new instruments and updated older ones manage off-device storage from the start, instead of each inventing its own scheme.</p>
+
+<h3 id="s1-3"><span class="num">1.3</span>Scope</h3>
+<p>This specification defines:</p>
+<ul>
+  <li>The System Exclusive message envelope and every MBSP message (Section 4 and Section 6).</li>
+  <li>The common data structures carried in those messages (Section 5).</li>
+  <li>The procedures for discovery, Store, Retrieve, Query and Delete, including error handling and timeouts (Section 7).</li>
+  <li>Conformance requirements for Servers and Clients (Sections 8 and 9).</li>
+</ul>
+<p>The following are outside the scope of this version:</p>
+<ul>
+  <li>The format or meaning of the stored data. Payloads are opaque to the Server.</li>
+  <li>How a Client presents MBSP functions to its user.</li>
+  <li>How a Server stores records internally, backs them up, or exchanges them with other Servers.</li>
+  <li>Authentication, authorization and encryption (see Section 10).</li>
+</ul>
+
+<h3 id="s1-4"><span class="num">1.4</span>Design Goals</h3>
+<ul>
+  <li><b>Device-initiated.</b> The Client decides what to save and when, and restores its own data without a computer.</li>
+  <li><b>Works on MIDI 1.0.</b> Every message is a valid MIDI 1.0 System Exclusive message, usable over 31.25 kbaud DIN connections, mergers and splitters.</li>
+  <li><b>Small footprint.</b> A Client needs to hold only one data block and a few counters at a time. No sessions or connection state are kept between transactions.</li>
+  <li><b>Data-agnostic Server.</b> The Server stores opaque payloads with a small amount of descriptive metadata, so one Server serves every device.</li>
+  <li><b>Coexistence.</b> MBSP traffic can share a MIDI network with other devices, which ignore it, and with several Clients and Servers at once.</li>
+</ul>
+</section>
+
+<!-- ===================== 2 Conventions ===================== -->
+<section>
+<h2 id="s2"><span class="num">2</span>Conventions and Terminology</h2>
+
+<h3 id="s2-1"><span class="num">2.1</span>Requirement Keywords</h3>
+<p>The key words <span class="rfc">must</span>, <span class="rfc">must not</span>, <span class="rfc">required</span>, <span class="rfc">shall</span>, <span class="rfc">shall not</span>, <span class="rfc">should</span>, <span class="rfc">should not</span>, <span class="rfc">recommended</span>, <span class="rfc">may</span> and <span class="rfc">optional</span> in this document are to be interpreted as described in IETF BCP 14 (RFC 2119 and RFC 8174) when, and only when, they appear in small capitals as shown here.</p>
+
+<h3 id="s2-2"><span class="num">2.2</span>Numeric Notation</h3>
+<p>Hexadecimal values are written with an "h" suffix, for example <code>7Fh</code>. Byte sequences are written as space-separated hexadecimal pairs without the suffix, for example <code>F0 7E 7F</code>. Decimal values have no suffix. Bit 0 is the least significant bit.</p>
+
+<h3 id="s2-3"><span class="num">2.3</span>Data Types</h3>
+<p>Every byte between the System Exclusive status bytes <code>F0h</code> and <code>F7h</code> is a 7-bit data byte (<code>00h</code>-<code>7Fh</code>). Multi-byte values are sent least significant group first, 7 bits per byte, as in the MIDI 1.0 Pitch Bend message.</p>
+<table class="keep">
+  <caption>Table 1. Field data types</caption>
+  <thead><tr><th style="width:16%">Type</th><th style="width:12%">Bytes</th><th style="width:22%">Range</th><th>Encoding</th></tr></thead>
+  <tbody>
+    <tr><td><code>u7</code></td><td>1</td><td>0 - 127</td><td>One data byte.</td></tr>
+    <tr><td><code>u14</code></td><td>2</td><td>0 - 16,383</td><td>Bits 0-6, then bits 7-13.</td></tr>
+    <tr><td><code>u21</code></td><td>3</td><td>0 - 2,097,151</td><td>Bits 0-6, 7-13, 14-20.</td></tr>
+    <tr><td><code>u28</code></td><td>4</td><td>0 - 268,435,455</td><td>Bits 0-6, 7-13, 14-20, 21-27.</td></tr>
+    <tr><td><code>u32</code></td><td>5</td><td>0 - 4,294,967,295</td><td>Bits 0-6, 7-13, 14-20, 21-27, then bits 28-31 in the low 4 bits of the fifth byte, whose upper 3 bits are 0.</td></tr>
+    <tr><td><code>string(a-b)</code></td><td>1 + n</td><td>n = a to b characters</td><td>A <code>u7</code> length n followed by n characters. Characters are printable ASCII (<code>20h</code>-<code>7Eh</code>). There is no terminator. Restricting strings to ASCII is a limitation of Version 1 (Section 12).</td></tr>
+    <tr><td><code>bytes(n)</code></td><td>n</td><td>-</td><td>n data bytes, each <code>00h</code>-<code>7Fh</code>.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s2-4"><span class="num">2.4</span>Terms and Definitions</h3>
+<table>
+  <thead><tr><th style="width:24%">Term</th><th>Definition</th></tr></thead>
+  <tbody>
+    <tr><td>Client</td><td>A device or application that uses a Server to store and recall its bulk data. Typically an instrument, sequencer, drum machine, effects unit, controller or software instrument.</td></tr>
+    <tr><td>Server</td><td>A device or application that answers MBSP requests and keeps Records. It runs unattended and does not interpret payloads. It is addressed by its MUID and shown to users by its Server Name.</td></tr>
+    <tr><td>Payload</td><td>The bulk data a Client stores, as an opaque sequence of 7-bit bytes.</td></tr>
+    <tr><td>Record</td><td>One stored Payload together with its metadata, identified on its Server by a Record ID.</td></tr>
+    <tr><td>Request</td><td>A message sent by a Client to a Server.</td></tr>
+    <tr><td>Reply</td><td>A message sent by a Server in answer to a Request.</td></tr>
+    <tr><td>Transaction</td><td>A Request and all of its Replies, plus any further Client messages that belong to it (Data Blocks), all carrying the same Client MUID and Transaction ID.</td></tr>
+    <tr><td>Block</td><td>One part of a Payload carried in a single Data Block message.</td></tr>
+    <tr><td>MUID</td><td>A random 28-bit number that identifies a Client or a Server on the network until it next powers up (Section 5.5). Every message carries the sender's MUID and the recipient's MUID.</td></tr>
+    <tr><td>Device Identity</td><td>The manufacturer, family and model of a device, as reported in its Universal Device Inquiry reply (Section 5.2).</td></tr>
+    <tr><td>Owner</td><td>The device that stored a Record, identified by the Device Identity and Client Device SysEx ID sent with the Store.</td></tr>
+    <tr><td>Broadcast MUID</td><td>The MUID <code>0FFFFFFFh</code>, which addresses every device. Only DiscoverServers and OnlineServer are sent to it (Section 4.5).</td></tr>
+    <tr><td>Announcement</td><td>An OnlineServer that a Server sends unprompted to the broadcast MUID with Transaction ID 0: in Beacon Mode, or after drawing a new MUID (Sections 5.5 and 6.2).</td></tr>
+    <tr><td>Payload Type</td><td>The byte that classifies a Payload: a Category, such as Patch or Calibration Data, and whether it is a single item or a collection (Section 5.9).</td></tr>
+    <tr><td>Replace Record ID</td><td>The Store_Header field that makes a Store replace an existing Record instead of creating a new one (Section 7.2).</td></tr>
+    <tr><td>Completed Store Memory</td><td>The time for which a Server remembers the final Status of a finished Store, so that it can repeat it if that Status was lost (Section 7.2).</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s2-5"><span class="num">2.5</span>Abbreviations</h3>
+<table>
+  <thead><tr><th style="width:24%">Abbreviation</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>AMEI</td><td>Association of Musical Electronics Industry</td></tr>
+    <tr><td>CRC</td><td>Cyclic Redundancy Check</td></tr>
+    <tr><td>DIN</td><td>The 5-pin MIDI 1.0 connector and its 31.25 kbaud serial connection</td></tr>
+    <tr><td>MIDI-CI</td><td>MIDI Capability Inquiry</td></tr>
+    <tr><td>MMA</td><td>MIDI Manufacturers Association</td></tr>
+    <tr><td>MUID</td><td>MIDI Unique Identifier (Section 5.5)</td></tr>
+    <tr><td>SysEx</td><td>System Exclusive message</td></tr>
+    <tr><td>UMP</td><td>Universal MIDI Packet (MIDI 2.0)</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ===================== 3 Overview ===================== -->
+<section>
+<h2 id="s3"><span class="num">3</span>Protocol Overview</h2>
+
+<h3 id="s3-1"><span class="num">3.1</span>Roles</h3>
+<p>A Client initiates every Transaction. A Server only ever sends Replies, apart from optional OnlineServer announcements (Section 6.2). A device <span class="rfc">may</span> act as both a Client and a Server, but the two roles are independent.</p>
+
+<h3 id="s3-2"><span class="num">3.2</span>Network Model</h3>
+<p>MBSP needs a two-way MIDI connection between each Client and the Server it uses, because every operation, including discovery, is a Request followed by Replies. Over MIDI 1.0 DIN this means a cable or route in each direction. A Client that can only send to a Server, or only receive from it, cannot use MBSP.</p>
+<figure><svg viewBox="0 0 640 230" role="img" aria-label="MBSP Clients and a Server on a two-way MIDI network"><defs><marker id="figNetA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1a1a1a"/></marker></defs><rect x="20" y="8" width="170" height="44" fill="#e8e8e8" stroke="#1a1a1a" stroke-width="1"/><text x="105" y="26" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">Synthesizer</text><text x="105" y="41" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" fill="#444">MBSP Client</text><rect x="235" y="8" width="170" height="44" fill="#e8e8e8" stroke="#1a1a1a" stroke-width="1"/><text x="320" y="26" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">Drum machine</text><text x="320" y="41" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" fill="#444">MBSP Client</text><rect x="450" y="8" width="170" height="44" fill="#e8e8e8" stroke="#1a1a1a" stroke-width="1"/><text x="535" y="26" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">Sequencer</text><text x="535" y="41" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" fill="#444">MBSP Client</text><line x1="105" y1="54" x2="105" y2="92" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#figNetA)" marker-end="url(#figNetA)"/><line x1="320" y1="54" x2="320" y2="92" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#figNetA)" marker-end="url(#figNetA)"/><line x1="535" y1="54" x2="535" y2="92" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#figNetA)" marker-end="url(#figNetA)"/><rect x="20" y="94" width="600" height="44" fill="#f6f6f6" stroke="#1a1a1a" stroke-width="1"/><text x="320" y="112" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">MIDI network: both directions to every device</text><text x="320" y="127" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" fill="#444">DIN cables, mergers and splitters, USB MIDI, MIDI 2.0 UMP, software routing</text><line x1="320" y1="140" x2="320" y2="178" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#figNetA)" marker-end="url(#figNetA)"/><rect x="195" y="180" width="250" height="44" fill="#e8e8e8" stroke="#1a1a1a" stroke-width="1"/><text x="320" y="198" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">MBSP Server</text><text x="320" y="213" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" fill="#444">Stores opaque Payloads with searchable metadata</text></svg><figcaption>Figure 1. MBSP Clients and a Server on a MIDI network that carries messages in both directions</figcaption></figure>
+<p>MBSP assumes a MIDI network in which every message may reach every device, as happens with MIDI mergers, splitters, Thru chains, multi-port interfaces and software routing. All MBSP messages are therefore sent to the All Call device ID (<code>7Fh</code>), and addressing is done inside the message:</p>
+<ul>
+  <li>Every message carries the sender's <b>Source MUID</b> and the recipient's <b>Destination MUID</b> (Section 4.5). A device ignores any message whose Destination MUID is neither its own nor the broadcast MUID.</li>
+  <li>Clients and Servers each draw a random MUID at power-up. A Client finds Servers, and learns their MUIDs, through discovery (Section 7.1). The <b>Server Name</b> is a display name that Servers announce in OnlineServer.</li>
+  <li>Requests and Replies carry a <b>Transaction ID</b> chosen by the Client, so a Client can have several Transactions open at once.</li>
+</ul>
+<p>MBSP does not route or forward messages. Discovery reaches exactly the devices that the MIDI routing connects to the Client in both directions. A device with several MIDI ports <span class="rfc">may</span> use MBSP on any of them, and <span class="rfc">should</span> send its Requests to a Server on the port where it discovered that Server. Section 11.3 covers MIDI 2.0 UMP Groups.</p>
+<p>Devices that do not implement MBSP ignore MBSP messages, because MIDI 1.0 requires receivers to ignore Universal System Exclusive messages whose Sub-IDs they do not recognize.</p>
+
+<h3 id="s3-3"><span class="num">3.3</span>Transactions and Statelessness</h3>
+<p>MBSP has no sessions, connections or logins. Every Transaction is complete in itself. A Store or Retrieve Transaction spans several messages, so the receiving side keeps temporary reassembly state, keyed on Client MUID and Transaction ID, until the Transaction completes or times out. No state carries over from one Transaction to the next.</p>
+<p>Store and Retrieve transfers are flow-controlled: the receiver acknowledges each Block and asks for the next one, so a sender never sends faster than the receiver can process (Section 7.4).</p>
+
+<h3 id="s3-4"><span class="num">3.4</span>Message Summary</h3>
+<table>
+  <caption>Table 2. MBSP messages</caption>
+  <thead><tr><th style="width:9%" class="c">Type</th><th style="width:29%">Message</th><th style="width:17%">Direction</th><th>Purpose and Replies</th></tr></thead>
+  <tbody>
+    <tr><td class="c">0</td><td>MBSP_DiscoverServers</td><td>Client to all</td><td>Find Servers. Each Server replies with OnlineServer.</td></tr>
+    <tr><td class="c">1</td><td>MBSP_OnlineServer</td><td>Server</td><td>Reply to DiscoverServers, or an unsolicited announcement (Beacon Mode). Lists the Server's Protocol Versions, policies and limits.</td></tr>
+    <tr><td class="c">2</td><td>MBSP_Status</td><td>Server</td><td>Result of a Request: success, or the reason for failure.</td></tr>
+    <tr><td class="c">10</td><td>MBSP_Store_Header</td><td>Client</td><td>Begins a Store of a new Record, or the replacement of an existing one. Followed by Store_Data_Block messages. Reply: Status.</td></tr>
+    <tr><td class="c">11</td><td>MBSP_Store_Data_Block</td><td>Client</td><td>One Block of the Payload being stored.</td></tr>
+    <tr><td class="c">12</td><td>MBSP_Store_Block_Ack</td><td>Server</td><td>Flow control: "send Block <i>n</i>".</td></tr>
+    <tr><td class="c">20</td><td>MBSP_Retrieve_Request</td><td>Client</td><td>Requests a Record. Reply: Retrieve_Header and Retrieve_Data_Blocks, or Status.</td></tr>
+    <tr><td class="c">21</td><td>MBSP_Retrieve_Header</td><td>Server</td><td>Describes the Record being returned.</td></tr>
+    <tr><td class="c">22</td><td>MBSP_Retrieve_Data_Block</td><td>Server</td><td>One Block of the Payload being returned.</td></tr>
+    <tr><td class="c">23</td><td>MBSP_Retrieve_Block_Ack</td><td>Client</td><td>Flow control: "send Block <i>n</i>"; <i>n</i> = NumBlocks ends the transfer.</td></tr>
+    <tr><td class="c">30</td><td>MBSP_Query_Request</td><td>Client</td><td>Searches the Server's Records. Reply: Query_Results, or Status.</td></tr>
+    <tr><td class="c">31</td><td>MBSP_Query_Result</td><td>Server</td><td>Describes one matching Record.</td></tr>
+    <tr><td class="c">40</td><td>MBSP_Delete_Request</td><td>Client</td><td>Deletes a Record. Reply: Status.</td></tr>
+  </tbody>
+</table>
+<p>Message Type values not listed are reserved. Values 0-9 are reserved for discovery and general messages, and each further range of ten belongs to one operation, leaving room for extensions.</p>
+</section>
+
+<!-- ===================== 4 Envelope ===================== -->
+<section>
+<h2 id="s4"><span class="num">4</span>Message Envelope</h2>
+
+<h3 id="s4-1"><span class="num">4.1</span>Layout</h3>
+<p>Every MBSP message has the following layout. <i>k</i> is the Access Key length.</p>
+<table class="fields keep">
+  <caption>Table 3. MBSP System Exclusive envelope</caption>
+  <thead><tr><th style="width:13%">Offset</th><th style="width:9%">Bytes</th><th style="width:16%">Value</th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>1</td><td><code>F0h</code></td><td>System Exclusive status</td></tr>
+    <tr><td>1</td><td>1</td><td><code>7Eh</code></td><td>Universal Non-Real Time System Exclusive ID</td></tr>
+    <tr><td>2</td><td>1</td><td><code>7Fh</code></td><td>Device ID: All Call. MBSP addresses devices inside the message (Section 3.2).</td></tr>
+    <tr><td>3</td><td>1</td><td><code>6Ah</code>*</td><td>Sub-ID #1: MIDI Bulk Storage Protocol. *Placeholder pending assignment (Section 13).</td></tr>
+    <tr><td>4</td><td>1</td><td><code>00h</code></td><td>Sub-ID #2: MBSP Base Protocol. Other values are reserved for future MBSP extensions.</td></tr>
+    <tr><td>5</td><td>1</td><td><code>01h</code></td><td>MBSP Protocol Version: 1 for this specification.</td></tr>
+    <tr><td>6</td><td>1</td><td>0 - 16</td><td>Access Key Length <i>k</i>. 0 = no Access Key.</td></tr>
+    <tr><td>7</td><td><i>k</i></td><td>ASCII</td><td>Access Key (Section 4.4).</td></tr>
+    <tr><td>7+<i>k</i></td><td>4</td><td><code>u28</code></td><td>Source MUID: the sender's MUID (Section 4.5).</td></tr>
+    <tr><td>11+<i>k</i></td><td>4</td><td><code>u28</code></td><td>Destination MUID: the recipient's MUID, or broadcast (Section 4.5).</td></tr>
+    <tr><td>15+<i>k</i></td><td>2</td><td><code>u14</code></td><td>Transaction ID (Section 4.6).</td></tr>
+    <tr><td>17+<i>k</i></td><td>1</td><td><code>u7</code></td><td>Message Type (Table 2).</td></tr>
+    <tr><td>18+<i>k</i></td><td><i>n</i></td><td>-</td><td>Payload of the message, as defined for each Message Type in Section 6.</td></tr>
+    <tr><td>18+<i>k</i>+<i>n</i></td><td>1</td><td><code>u7</code></td><td>Message Checksum (Section 4.7).</td></tr>
+    <tr><td>19+<i>k</i>+<i>n</i></td><td>1</td><td><code>F7h</code></td><td>End of Exclusive</td></tr>
+  </tbody>
+</table>
+<p>The smallest MBSP message (no Access Key, empty payload) is 20 bytes long.</p>
+
+<h3 id="s4-2"><span class="num">4.2</span>Protocol Version</h3>
+<p>This specification defines Protocol Version 1. A receiver <span class="rfc">must</span> ignore any message whose Protocol Version it does not implement, because the layout after the Version byte may differ.</p>
+<p>Discovery is the exception, so that a Client can always find out which versions a Server supports:</p>
+<ul>
+  <li>A Server <span class="rfc">shall</span> answer DiscoverServers whatever its Protocol Version. DiscoverServers has an empty payload in every version.</li>
+  <li>A Server <span class="rfc">shall</span> always send OnlineServer with Protocol Version 1, so that every Client can read it. Its Supported Versions field lists every Protocol Version the Server implements, and the Client then uses one of them for its Requests.</li>
+  <li>Later versions <span class="rfc">may</span> append fields to OnlineServer but <span class="rfc">shall not</span> change the fields defined here. A Client <span class="rfc">shall</span> ignore any bytes after the OnlineServer fields it knows.</li>
+</ul>
+
+<h3 id="s4-3"><span class="num">4.3</span>Sub-ID #2</h3>
+<p>Sub-ID #2 <code>00h</code> identifies the base protocol defined here. Other values are reserved for future extensions of MBSP, which may define their own message sets. A receiver <span class="rfc">must</span> ignore messages with a Sub-ID #2 it does not implement.</p>
+
+<h3 id="s4-4"><span class="num">4.4</span>Access Key</h3>
+<p>The Access Key is an optional string of 0-16 printable ASCII characters that a Server <span class="rfc">may</span> require before it accepts Store, Retrieve, Query or Delete Requests. Its meaning is defined by the Server's configuration, not by this specification. A Server that requires a key and receives a Request without the matching key <span class="rfc">shall</span> reply with Status 2 (Refused). Servers <span class="rfc">should</span> answer DiscoverServers whatever the key, so that Clients can always find them.</p>
+<p>Keys are compared byte for byte, so letter case and spaces are significant. A Server with no configured key accepts every Request, whatever key it carries. The key is checked on the Request that opens a Transaction (Store_Header, Retrieve_Request, Query_Request or Delete_Request), and a change of the Server's key does not affect Transactions already open.</p>
+<p>Servers <span class="rfc">should</span> send Replies with an Access Key Length of 0. Clients <span class="rfc">must not</span> depend on the Access Key of a Reply. The Access Key is sent in clear text and provides no protection against a party that can observe MIDI traffic (Section 10).</p>
+
+<h3 id="s4-5"><span class="num">4.5</span>Source and Destination MUID</h3>
+<p>Every message carries two MUIDs (Section 5.5), as MIDI-CI messages do:</p>
+<table class="keep">
+  <thead><tr><th style="width:34%">Message</th><th style="width:30%">Source MUID</th><th>Destination MUID</th></tr></thead>
+  <tbody>
+    <tr><td>Request (Client to Server)</td><td>The Client's MUID</td><td>The target Server's MUID</td></tr>
+    <tr><td>DiscoverServers</td><td>The Client's MUID</td><td>Broadcast, or one Server's MUID</td></tr>
+    <tr><td>Reply (Server to Client)</td><td>The Server's MUID</td><td>The MUID of the Client being answered</td></tr>
+    <tr><td>OnlineServer announcement</td><td>The Server's MUID</td><td>Broadcast</td></tr>
+  </tbody>
+</table>
+<p>The value <code>0FFFFFFFh</code> (sent as <code>7F 7F 7F 7F</code>) is the broadcast MUID. Only DiscoverServers and OnlineServer are sent to it, and it is never a Source MUID. The Server Name plays no part in addressing.</p>
+
+<h3 id="s4-6"><span class="num">4.6</span>Transaction ID</h3>
+<p>The Transaction ID is a 14-bit number chosen by the Client. A Client <span class="rfc">shall</span> give each new Transaction a Transaction ID that is not in use by any of its open Transactions, and <span class="rfc">should</span> do this by incrementing a counter that wraps from 3FFFh to 0. Transaction IDs only need to be unique for one Client MUID. Every message belonging to a Transaction, including Data Blocks and all Replies, carries the same Transaction ID.</p>
+
+<h3 id="s4-7"><span class="num">4.7</span>Message Checksum</h3>
+<p>The Message Checksum covers every byte after <code>F0h</code> up to, but not including, the checksum byte itself. It uses the algorithm widely used in Roland System Exclusive messages:</p>
+<pre class="bytes">checksum = (128 - (sum of covered bytes modulo 128)) modulo 128</pre>
+<p>Equivalently, the covered bytes plus the checksum sum to a multiple of 128. For example, the DiscoverServers message in Appendix A covers the bytes <code>7E 7F 6A 00 01 00 56 68 48 00 7F 7F 7F 7F 01 00 00</code>, which sum to 1,131 (46Bh). 1,131 modulo 128 is 107, so the checksum is 128 - 107 = 21 (<code>15h</code>).</p>
+<p>The Message Checksum protects each message on its way across one MIDI link and detects any error confined to a single one of the bytes it covers. Payloads are also protected end to end by the stronger CRC-32 Full Payload Checksum (Section 5.11).</p>
+
+<h3 id="s4-8"><span class="num">4.8</span>Reception Rules</h3>
+<p>A receiver <span class="rfc">shall</span> silently ignore a message (send nothing in reply) if any of the following is true:</p>
+<ul>
+  <li>Bytes 1-4 are not <code>7E 7F</code> followed by the MBSP Sub-ID #1 and a supported Sub-ID #2.</li>
+  <li>Any byte between <code>F0h</code> and <code>F7h</code> is greater than <code>7Fh</code>.</li>
+  <li>The message is too short to hold the envelope, or the Access Key Length is greater than 16.</li>
+  <li>The Message Checksum is wrong.</li>
+  <li>The Protocol Version is not implemented, except for DiscoverServers (Section 4.2).</li>
+  <li>The Destination MUID is neither the receiver's own MUID nor the broadcast MUID, or the message is sent to the broadcast MUID but is not DiscoverServers or OnlineServer.</li>
+  <li>The Message Type is not defined in the Protocol Version the receiver implements. The receiver cannot know the message's layout or what reply, if any, it expects.</li>
+</ul>
+<p>A message whose Source MUID is the receiver's own MUID is either an echo or a sign of a MUID collision, and is handled as described in Section 5.5.</p>
+<p>Errors found after the envelope has been accepted are handled as described for each message in Section 6 and in Section 8.</p>
+</section>
+
+<!-- ===================== 5 Data structures ===================== -->
+<section>
+<h2 id="s5"><span class="num">5</span>Common Data Structures</h2>
+
+<h3 id="s5-1"><span class="num">5.1</span>Server Name</h3>
+<p>A <code>string(4-16)</code>, such as "StudioVault", that users know a Server by. It is carried only in OnlineServer. Servers are addressed by MUID, not by name (Section 4.5), so a Client that knows a Server by name looks up its current MUID through discovery (Section 7.1).</p>
+<ul>
+  <li>A Server's name <span class="rfc">should</span> be configurable by its user, and <span class="rfc">should</span> be unique on the network. Names are compared byte for byte (case-sensitive).</li>
+  <li>A Server <span class="rfc">should</span> give itself a default name that is unlikely to match another unit's, for example by adding part of its serial number ("Vault-3F2A"), rather than giving every unit the same name.</li>
+  <li>Two Servers with the same name still work correctly, because each has its own MUID, but users cannot tell them apart. A Client that discovers several Servers with the same name <span class="rfc">shall not</span> choose one of them automatically (Section 7.1).</li>
+</ul>
+
+<h3 id="s5-2"><span class="num">5.2</span>Device Identity</h3>
+<p>A 7-byte structure that identifies the make and model of a device. It uses the values the device already returns in its Universal Device Inquiry reply (<code>F0 7E &lt;device&gt; 06 02 ...</code>), so most devices can supply it without new constants.</p>
+<table class="fields keep">
+  <caption>Table 4. Device Identity</caption>
+  <thead><tr><th style="width:36%">Field</th><th style="width:10%">Bytes</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Manufacturer ID</td><td>3</td><td>A 1-byte ID is sent as <code>&lt;ID&gt; 00 00</code>. A 3-byte ID (<code>00 xx xx</code>) is sent as-is.</td></tr>
+    <tr><td>Device Family Code</td><td>2</td><td>As in the Device Inquiry reply, least significant byte first.</td></tr>
+    <tr><td>Device Family Member (Model) Code</td><td>2</td><td>As in the Device Inquiry reply, least significant byte first.</td></tr>
+  </tbody>
+</table>
+<p>Device Identity is the machine-readable key used for matching in Query and Delete. Servers do not need, and <span class="rfc">should not</span> rely on, tables that translate Device Identities into product names. The Client Device Name serves that purpose.</p>
+
+<h3 id="s5-3"><span class="num">5.3</span>Client Device Name</h3>
+<p>An optional <code>string(0-32)</code> chosen by the Client for display, such as "Juno-106" or "Studio Prophet". Length 0 means not provided. Servers <span class="rfc">should</span> display it as received and <span class="rfc">shall not</span> use it for matching.</p>
+
+<h3 id="s5-4"><span class="num">5.4</span>Client Device SysEx ID</h3>
+<p>One byte holding the device's own System Exclusive Device ID (<code>00h</code>-<code>7Eh</code>), or <code>7Fh</code> for "not provided". It tells apart several units of the same model on one network, for example two identical synthesizers set to Device IDs 00h and 01h. Device Identity together with Client Device SysEx ID identifies a single unit and is used as the Record's Owner.</p>
+<div class="note"><b>Note</b>If a user changes a device's SysEx Device ID, Records stored before the change no longer match queries filtered on the new ID. They remain reachable by querying with the SysEx ID filter set to 7Fh (any).</div>
+<div class="note"><b>Note</b>Several units of the same model that all send 7Fh share one Owner identity, so the Owner-only Delete policy cannot tell them apart, and each can replace or delete the others' Records. Such devices <span class="rfc">should</span> let the user set a SysEx Device ID. A persistent identifier for each unit is an open issue (Section 12).</div>
+
+<h3 id="s5-5"><span class="num">5.5</span>MUID</h3>
+<p>A 28-bit value that identifies a Client or a Server on the network until it next powers up, modelled on the MUID of MIDI Capability Inquiry (MIDI-CI).</p>
+<ul>
+  <li>Every Client and every Server <span class="rfc">shall</span> generate its own MUID as a random number, at power-up or when MBSP starts. No central authority assigns MUIDs.</li>
+  <li>The random number <span class="rfc">shall not</span> be predictable from one power-up to the next. A device <span class="rfc">shall not</span> use a fixed seed, or one that is the same at every start, such as a timer read straight after reset. It <span class="rfc">should</span> mix something unique to the unit, such as a serial number or chip ID, with a source that varies, such as analog noise or the timing of user input. Otherwise identical units switched on together would draw the same MUID every time.</li>
+  <li>Values <code>0FFFFF00h</code>-<code>0FFFFFFEh</code> are reserved and <code>0FFFFFFFh</code> is the broadcast MUID. A device that draws one of these values <span class="rfc">shall</span> draw again.</li>
+  <li>A device that contains several independent Clients or Servers <span class="rfc">shall</span> give each its own MUID.</li>
+  <li>A device <span class="rfc">should</span> generate a new MUID at every power-up. The MUID is therefore not a persistent identity: it is never stored with a Record, and a Record's Owner is identified by Device Identity and SysEx ID instead (Section 5.4).</li>
+</ul>
+<div class="note"><b>Note</b>A Server <span class="rfc">may</span> instead keep its MUID across power cycles, so that its Clients do not need to rediscover it after it restarts. It <span class="rfc">may</span> do so only if the MUID was generated on the unit itself. A MUID stored in a firmware image or copied from another unit would give every such unit the same MUID. A Server that keeps its MUID <span class="rfc">shall</span> still replace it when it detects a collision, and Clients <span class="rfc">shall not</span> rely on a Server keeping its MUID.</div>
+<p><b>Collisions.</b> Two devices with the same MUID would each receive the other's messages. A device detects this when it receives a message whose Source MUID is its own but which it did not send:</p>
+<ul>
+  <li>The device <span class="rfc">shall</span> first rule out an echo of its own message, which a MIDI loop or Thru connection can send back. A message identical to one the device sent within the last few seconds is an echo, and is ignored.</li>
+  <li>Otherwise the device <span class="rfc">shall</span> abandon its open Transactions, generate a new MUID and use it from then on. A Server <span class="rfc">shall</span> then announce its new MUID by broadcasting OnlineServer with Transaction ID 0, so that its Clients can follow it. Their Transactions that were open on the Server fail, and they <span class="rfc">may</span> retry them.</li>
+</ul>
+<p>With truly random MUIDs, collisions are very rare: for a network of ten devices, about 1 in 6 million at each power-up. The rules above mainly protect against weak random number generation.</p>
+
+<h3 id="s5-6"><span class="num">5.6</span>Record ID</h3>
+<p>A <code>u21</code> assigned by the Server when a Store succeeds, unique among that Server's Records. Record ID 0 is reserved and means "no Record" or "not applicable". A Server <span class="rfc">shall</span> give each new Record a Record ID higher than any it has assigned before, so it never reuses the Record ID of a deleted Record: a Client holding an old Record ID receives Not Found rather than different data, and Records stored during a paged Query appear only after the existing ones (Section 7.5). This continues across power cycles, and a Server that restores a backup continues after the highest Record ID it has assigned or restored. When no Record IDs remain, the Server replies to Store with Status 6 (Storage Full). A Store that replaces a Record keeps that Record's ID (Section 7.2).</p>
+
+<h3 id="s5-7"><span class="num">5.7</span>Payload Number and Payload Name</h3>
+<p>The <b>Payload Number</b> is <b>required</b>. It is a <code>string(1-8)</code> giving the item's location or number on the device, such as "B22", "099" or "I-05". Every device can name the slot an item came from, and the number is what a Client uses to put retrieved data back in the right place. For data that has no slot, such as global settings or calibration, the Client uses a fixed descriptive string such as "GLOBAL" or "CAL". A Store whose Payload Number is empty <span class="rfc">shall</span> be answered with Status Invalid Request (8).</p>
+<p>The <b>Payload Name</b> is <b>optional</b>. It is a <code>string(0-32)</code> giving the item's name, such as "Mini Lead". Length 0 means not provided, for example for a device that does not name its patches or for data such as calibration that has no name. Servers <span class="rfc">shall</span> accept a Payload Name of length 0 and <span class="rfc">should</span> display such Records by their Payload Number. A Record without a name never matches a non-empty Payload Name Filter.</p>
+<p>Both are chosen by the Client and are stored and returned unchanged.</p>
+
+<h3 id="s5-8"><span class="num">5.8</span>Tags</h3>
+<p>A tag list is a <code>u7</code> count (0-8) followed by that many <code>string(1-16)</code> tags, such as "Pad", "Bass" or "Live Set 3". Tags help users and Clients find Records. Servers store tags as received and compare them without regard to ASCII letter case.</p>
+
+<h3 id="s5-9"><span class="num">5.9</span>Client Payload Type</h3>
+<p>One byte that classifies the Payload. It is made of two parts:</p>
+<ul>
+  <li><b>Bits 0-5: Category</b> (<code>00h</code>-<code>3Eh</code>), from Table 5. Category <code>3Fh</code> is reserved and never used.</li>
+  <li><b>Bit 6 (40h): Collection bit.</b> 0 = a single item, 1 = a collection (bank) of items of that Category. For example, <code>01h</code> is a single Patch and <code>41h</code> is a Bank of Patches.</li>
+</ul>
+<p>The value <code>7Fh</code> means "Any". It is used only as a Query filter and is not valid in a Store. Because Category 3Fh is never used, <code>7Fh</code> cannot be mistaken for a collection of Category 3Fh.</p>
+<table class="keep">
+  <caption>Table 5. Payload Type Categories</caption>
+  <thead><tr><th style="width:11%" class="c">Category</th><th style="width:27%">Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td class="c"><code>00h</code></td><td>Universal / Unknown</td><td>Data that fits no other Category, or whose kind the Client does not state.</td></tr>
+    <tr><td class="c"><code>01h</code></td><td>Patch / Program</td><td>A single sound, voice, preset or program.</td></tr>
+    <tr><td class="c"><code>02h</code></td><td>Performance / Multi</td><td>A multitimbral setup combining several Patches with splits, layers and effects (Combination, Performance, Multi, Setup).</td></tr>
+    <tr><td class="c"><code>03h</code></td><td>Global / System Settings</td><td>Global parameters and system configuration.</td></tr>
+    <tr><td class="c"><code>04h</code></td><td>File</td><td>A file kept in the device's own format, such as a project or disk image.</td></tr>
+    <tr><td class="c"><code>05h</code></td><td>Drum Kit / Rhythm Set</td><td>A drum kit or rhythm set definition.</td></tr>
+    <tr><td class="c"><code>06h</code></td><td>Pattern / Sequence</td><td>Step-sequencer patterns, phrases and arpeggio patterns.</td></tr>
+    <tr><td class="c"><code>07h</code></td><td>Song / Arrangement</td><td>Song or chain data, typically referring to Patterns.</td></tr>
+    <tr><td class="c"><code>08h</code></td><td>Sample / Waveform</td><td>Audio data, user waveforms and wavetables, including MIDI Sample Dump Standard data.</td></tr>
+    <tr><td class="c"><code>09h</code></td><td>Tuning / Scale</td><td>Microtuning tables and scales, including MIDI Tuning Standard bulk dumps.</td></tr>
+    <tr><td class="c"><code>0Ah</code></td><td>Effects Program</td><td>Effects settings stored apart from Patches, and programs of effects units.</td></tr>
+    <tr><td class="c"><code>0Bh</code></td><td>Controller Template / Mapping</td><td>Control and controller-number assignment maps for controllers.</td></tr>
+    <tr><td class="c"><code>0Ch</code></td><td>Calibration Data</td><td>Factory or user calibration of analog circuits. Often irreplaceable, and an important use of MBSP.</td></tr>
+    <tr><td class="c"><code>0Dh</code></td><td>Set List / Program Map</td><td>Live set lists and program-change maps.</td></tr>
+    <tr><td class="c"><code>0Eh</code></td><td>Firmware / OS</td><td>Operating system or firmware images. Servers <span class="rfc">may</span> refuse to store them (Section 8.4).</td></tr>
+    <tr><td class="c"><code>0Fh</code>-<code>2Fh</code></td><td>Reserved</td><td>Reserved for future standard Categories. Servers store them as opaque data.</td></tr>
+    <tr><td class="c"><code>30h</code>-<code>3Eh</code></td><td>Manufacturer-defined</td><td>Meaning depends on the Device Identity, for example operator presets, envelope shapes or name tables.</td></tr>
+    <tr><td class="c"><code>3Fh</code></td><td>Reserved</td><td>Never used.</td></tr>
+  </tbody>
+</table>
+<p>A dump of a device's current edit buffer is stored under the Category of what it contains, usually Patch. How to send it back to the device is up to the Client.</p>
+
+<h3 id="s5-10"><span class="num">5.10</span>Status Codes</h3>
+<table class="keep">
+  <caption>Table 6. Status Codes</caption>
+  <thead><tr><th style="width:7%" class="c">Code</th><th style="width:25%">Name</th><th style="width:21%">Used for</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td class="c">0</td><td>OK</td><td>Store, Delete</td><td>The Request succeeded.</td></tr>
+    <tr><td class="c">1</td><td>Not Found</td><td>Store, Retrieve, Query, Delete</td><td>No Record has that Record ID (for a Store, the Replace Record ID), or no Record matches the Query.</td></tr>
+    <tr><td class="c">2</td><td>Refused</td><td>Store, Retrieve, Query, Delete</td><td>Server policy forbids the Request: for example a read-only Server, Delete disabled (which also prevents Replace), a Delete or Replace by a device that is not the Owner, a Firmware Store, or a wrong Access Key.</td></tr>
+    <tr><td class="c">3</td><td>Payload Checksum Error</td><td>Store</td><td>The reassembled Payload does not match the Full Payload Checksum.</td></tr>
+    <tr><td class="c">4</td><td>Block Sequence Error</td><td>Store</td><td>A Data Block was missing or out of order. (A repeat of the last accepted Block is answered with the same ack, not an error.)</td></tr>
+    <tr><td class="c">5</td><td>Transaction Timeout</td><td>Store, Retrieve</td><td>Store: Data Blocks stopped arriving before the Payload was complete. Retrieve: the Client stopped acknowledging and the Server gave up after its retries.</td></tr>
+    <tr><td class="c">6</td><td>Storage Full</td><td>Store</td><td>The Server has no room or no free Record IDs.</td></tr>
+    <tr><td class="c">7</td><td>Busy</td><td>Any Request</td><td>The Server cannot handle the Request now. The Client <span class="rfc">may</span> retry later.</td></tr>
+    <tr><td class="c">8</td><td>Invalid Request</td><td>Any Request</td><td>The envelope is valid, but a payload field is missing, malformed or out of range.</td></tr>
+    <tr><td class="c">9</td><td>Unknown Transaction</td><td>Store</td><td>A Store_Data_Block arrived for no open Store Transaction of this Server, and for no recently finished Store it still remembers (Section 7.2). The Store ended longer ago than the Completed Store Memory, the Server restarted, or the Transaction never existed.</td></tr>
+    <tr><td class="c">10-127</td><td>Reserved</td><td>-</td><td>Clients <span class="rfc">shall</span> treat an unknown Status Code as a failure.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s5-11"><span class="num">5.11</span>Full Payload Checksum</h3>
+<p>A <code>u32</code> carried in Store_Header and Retrieve_Header. It is the CRC-32 of the complete Payload, computed over the Payload bytes in Block order, using the CRC-32 of IEEE 802.3 and zlib:</p>
+<table class="fields keep">
+  <caption>Table 7. Full Payload Checksum (CRC-32) parameters</caption>
+  <thead><tr><th style="width:36%">Parameter</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Polynomial</td><td><code>04C11DB7h</code> (<code>EDB88320h</code> in reflected form)</td></tr>
+    <tr><td>Initial value</td><td><code>FFFFFFFFh</code></td></tr>
+    <tr><td>Input and output reflected</td><td>Yes</td></tr>
+    <tr><td>Final XOR</td><td><code>FFFFFFFFh</code></td></tr>
+    <tr><td>Check value</td><td><code>CBF43926h</code> for the ASCII string "123456789", sent as <code>26 72 50 5F 0C</code></td></tr>
+  </tbody>
+</table>
+<p>The Client computes the CRC-32 before a Store. The Server checks it after reassembly, stores it with the Record, and returns it unchanged in Retrieve_Header, and the Client checks it again after a Retrieve. It therefore protects the Payload end to end: across reassembly, the Server's storage, any backup and restore, and the return trip. Unlike an additive checksum, it also detects Blocks reassembled in the wrong order. A table-free implementation needs only a few lines of code and keeps up easily with MIDI data rates on small microcontrollers.</p>
+</section>
+
+<!-- ===================== 6 Messages ===================== -->
+<section class="chapter">
+<h2 id="s6"><span class="num">6</span>Message Definitions</h2>
+<p>This section defines the payload of each message: the bytes between the Message Type and the Message Checksum (Table 3). Fields appear in the order listed, with no padding. A field marked "repeated" is present the number of times given by the preceding count.</p>
+
+<h3 id="s6-1"><span class="num">6.1</span>MBSP_DiscoverServers (Message Type 0)</h3>
+<p><b>Sender:</b> Client. <b>Purpose:</b> find every MBSP Server on the network. Sent to the broadcast Destination MUID. <b>Payload:</b> empty.</p>
+<p>Every Server that receives DiscoverServers <span class="rfc">shall</span> reply with MBSP_OnlineServer, sent from its own MUID to the requesting Client's MUID with the same Transaction ID. A Client <span class="rfc">may</span> also send DiscoverServers to one Server's MUID, to check that the Server is still there.</p>
+
+<h3 id="s6-2"><span class="num">6.2</span>MBSP_OnlineServer (Message Type 1)</h3>
+<p><b>Sender:</b> Server. <b>Purpose:</b> answer DiscoverServers, or announce the Server unprompted. It tells Clients which Protocol Versions the Server implements and how it is configured, so that a Client can avoid Requests that would fail. A Client learns the Server's MUID from the Source MUID of this message. OnlineServer is always sent with Protocol Version 1 (Section 4.2).</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Server Name</td><td><code>string(4-16)</code></td><td>-</td><td>The Server's display name (Section 5.1). OnlineServer is the only message that carries it.</td></tr>
+    <tr><td>Number of Supported Versions</td><td><code>u7</code></td><td>1-16</td><td>How many Protocol Versions follow.</td></tr>
+    <tr class="sub"><td>Supported Version (repeated)</td><td><code>u7</code></td><td>1-127</td><td>A Protocol Version the Server implements, in ascending order.</td></tr>
+    <tr><td>Policy Flags</td><td><code>u7</code></td><td>Table 8</td><td>The Server's policies (Section 8.4).</td></tr>
+    <tr><td>Max Store Block Size</td><td><code>u14</code></td><td>256-16,383</td><td>The largest Block Size the Server accepts in a Store_Data_Block.</td></tr>
+    <tr><td>Free Space</td><td><code>u28</code></td><td>-</td><td>About how many more Payload bytes the Server can store. <code>0FFFFFFFh</code> = not reported, or 256 MiB or more.</td></tr>
+  </tbody>
+</table>
+<table class="keep">
+  <caption>Table 8. OnlineServer Policy Flags</caption>
+  <thead><tr><th style="width:10%" class="c">Bit</th><th style="width:30%">Policy</th><th>When set</th></tr></thead>
+  <tbody>
+    <tr><td class="c">0</td><td>Read-only</td><td>Every Store is refused.</td></tr>
+    <tr><td class="c">1</td><td>No Delete</td><td>Every Delete, and every Store that replaces a Record, is refused. Set whenever bit 0 is set.</td></tr>
+    <tr><td class="c">2</td><td>Owner-only Delete</td><td>A Delete, or a Store that replaces a Record, is refused unless it comes from the Record's Owner.</td></tr>
+    <tr><td class="c">3</td><td>Firmware accepted</td><td>Stores of Category 0Eh (Firmware / OS) are accepted. When clear, they are refused.</td></tr>
+    <tr><td class="c">4</td><td>Access Key required</td><td>Requests without the Server's Access Key are refused (Section 4.4).</td></tr>
+    <tr><td class="c">5-6</td><td>Reserved</td><td>Sent as 0 and ignored by Clients.</td></tr>
+  </tbody>
+</table>
+<p>Policy Flags, Max Store Block Size and Free Space describe the Server when the message was sent, and are advisory. A Client <span class="rfc">should</span> use them to choose a Server and to avoid Requests that would fail, but <span class="rfc">shall</span> still handle Refused and Storage Full replies, because the Server's configuration or free space may change at any time.</p>
+<p>A Server <span class="rfc">may</span> also send OnlineServer at regular intervals to announce itself ("Beacon Mode"). Announcements use Destination MUID <code>0FFFFFFFh</code> (broadcast) and Transaction ID 0. Beacon Mode <span class="rfc">shall</span> be configurable and <span class="rfc">should</span> be off by default, because the extra traffic may not be welcome on every network.</p>
+
+<h3 id="s6-3"><span class="num">6.3</span>MBSP_Status (Message Type 2)</h3>
+<p><b>Sender:</b> Server. <b>Purpose:</b> report the outcome of a Request. Sent to the Client MUID of the Request it answers, with its Transaction ID.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Request Message Type</td><td><code>u7</code></td><td>-</td><td>The Message Type of the Request answered. For any outcome of a Store, including errors detected while receiving Data Blocks, this is 10 (Store_Header). For a Retrieve abandoned by the Server, this is 20 (Retrieve_Request).</td></tr>
+    <tr><td>Status Code</td><td><code>u7</code></td><td>Table 6</td><td>The outcome.</td></tr>
+    <tr><td>Record ID</td><td><code>u21</code></td><td>-</td><td>The Record concerned: the new Record ID after a successful Store, the Replace Record ID for any outcome of a Store that replaces a Record, or the requested Record ID for Retrieve and Delete. 0 if not applicable, for example for a Query.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-4"><span class="num">6.4</span>MBSP_Store_Header (Message Type 10)</h3>
+<p><b>Sender:</b> Client. <b>Purpose:</b> begin storing a Payload. It is followed by NumBlocks MBSP_Store_Data_Block messages with the same Client MUID and Transaction ID. The Server replies with MBSP_Status when the Transaction ends, successfully or not.</p>
+<p>A Store either creates a new Record or replaces an existing one, chosen by the Client with the Replace Record ID field. This corresponds to "Save As" and "Save": a user who keeps tweaking a patch and saving it replaces the same Record each time, while a user who wants to keep the earlier version stores a new Record. A Server never replaces a Record unless asked to, and never decides on its own that two Payloads are the same item (Section 7.2).</p>
+<table class="fields">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Replace Record ID</td><td><code>u21</code></td><td>0-2,097,151</td><td>0 = store a new Record. Otherwise the ID of the Record this Store replaces (Section 7.2).</td></tr>
+    <tr><td>Client Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>Section 5.2. Becomes part of the Record's Owner.</td></tr>
+    <tr><td>Client Device Name</td><td><code>string(0-32)</code></td><td>-</td><td>Section 5.3. Optional; length 0 if not provided.</td></tr>
+    <tr><td>Client Device SysEx ID</td><td><code>u7</code></td><td>00h-7Fh</td><td>Section 5.4. 7Fh = not provided.</td></tr>
+    <tr><td>Client Payload Type</td><td><code>u7</code></td><td>-</td><td>Section 5.9. <code>7Fh</code> and any value with Category 3Fh are not valid.</td></tr>
+    <tr><td>Payload Number</td><td><code>string(1-8)</code></td><td>-</td><td><b>Required.</b> Section 5.7.</td></tr>
+    <tr><td>Payload Name</td><td><code>string(0-32)</code></td><td>-</td><td><b>Optional;</b> length 0 if not provided. Section 5.7.</td></tr>
+    <tr><td>Number of Tags</td><td><code>u7</code></td><td>0-8</td><td>Section 5.8.</td></tr>
+    <tr class="sub"><td>Tag (repeated)</td><td><code>string(1-16)</code></td><td>-</td><td>One tag.</td></tr>
+    <tr><td>Payload Size</td><td><code>u21</code></td><td>0-2,097,151</td><td>Size of the complete Payload in bytes. The Blocks <span class="rfc">shall</span> add up to it (Section 7.2).</td></tr>
+    <tr><td>NumBlocks</td><td><code>u14</code></td><td>1-16,383</td><td>Number of Store_Data_Block messages that follow.</td></tr>
+    <tr><td>Full Payload Checksum</td><td><code>u32</code></td><td>-</td><td>CRC-32 of the complete Payload (Section 5.11), checked by the Server after reassembly.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-5"><span class="num">6.5</span>MBSP_Store_Data_Block (Message Type 11)</h3>
+<p><b>Sender:</b> Client. <b>Purpose:</b> carry one Block of the Payload. Blocks <span class="rfc">shall</span> be sent in order, starting at Block Index 0, and the Client <span class="rfc">shall not</span> send a Block until the Server has asked for it with MBSP_Store_Block_Ack (Section 7.4).</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Block Index</td><td><code>u14</code></td><td>0 to NumBlocks-1</td><td>Position of this Block within the Payload.</td></tr>
+    <tr><td>Block Size</td><td><code>u14</code></td><td>0-16,383</td><td>Number of Payload bytes in this Block. In a Store, no larger than the Server's Max Store Block Size (Section 6.2).</td></tr>
+    <tr><td>Block Data</td><td><code>bytes(Block Size)</code></td><td>-</td><td>The Payload bytes.</td></tr>
+  </tbody>
+</table>
+<p>A Server identifies the Transaction a Block belongs to by its Source MUID (the Client's MUID) and Transaction ID. A Block that belongs to no open Store Transaction is handled as follows (Section 7.2):</p>
+<ul>
+  <li>If the Block belongs to a Store that ended within the Completed Store Memory time, the Server <span class="rfc">shall</span> send that Store's final Status again, unchanged (the same Status Code and Record ID).</li>
+  <li>Otherwise the Server <span class="rfc">shall</span> reply with Status Unknown Transaction (9) and Request Message Type 10, so that the Client learns at once that its Store is no longer open.</li>
+</ul>
+
+<h3 id="s6-6"><span class="num">6.6</span>MBSP_Store_Block_Ack (Message Type 12)</h3>
+<p><b>Sender:</b> Server. <b>Purpose:</b> flow control for a Store. It tells the Client that everything before Block <i>n</i> has been received and that the Server is ready for Block <i>n</i>. It carries the Client MUID and Transaction ID of the Store.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody><tr><td>Next Block Index</td><td><code>u14</code></td><td>0 to NumBlocks-1</td><td>The Block the Server wants next.</td></tr></tbody>
+</table>
+<p>The Server sends Store_Block_Ack with Next Block Index 0 when it accepts a Store_Header, and with Next Block Index <i>i</i>+1 after accepting Block <i>i</i>, except after the last Block, which is answered by the final MBSP_Status. A Server that cannot accept the Store replies with MBSP_Status instead of the first ack. The Server <span class="rfc">may</span> delay an ack until it is ready, for example while it writes the previous Block to storage. The Client matches it to its Store by Transaction ID.</p>
+
+<h3 id="s6-7"><span class="num">6.7</span>MBSP_Retrieve_Request (Message Type 20)</h3>
+<p><b>Sender:</b> Client. <b>Purpose:</b> request a stored Record by Record ID. Record IDs come from Query_Result messages or from the Status reply to a Store. The Server replies with MBSP_Retrieve_Header, then sends each of the NumBlocks MBSP_Retrieve_Data_Block messages when the Client asks for it with MBSP_Retrieve_Block_Ack. On failure it replies with MBSP_Status.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Record ID</td><td><code>u21</code></td><td>1-2,097,151</td><td>The Record to retrieve.</td></tr>
+    <tr><td>Max Block Size</td><td><code>u14</code></td><td>0-16,383</td><td>The largest Block the Client can accept, in Payload bytes. 0 = no preference (Server default).</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-8"><span class="num">6.8</span>MBSP_Retrieve_Header (Message Type 21)</h3>
+<p><b>Sender:</b> Server. <b>Purpose:</b> describe the Record being returned. Its layout mirrors MBSP_Store_Header so that Clients can share parsing code. It is followed by NumBlocks MBSP_Retrieve_Data_Block messages with the same Client MUID and Transaction ID.</p>
+<table class="fields">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Record ID</td><td><code>u21</code></td><td>-</td><td>The Record being returned.</td></tr>
+    <tr><td>Client Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Client Device Name</td><td><code>string(0-32)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Client Device SysEx ID</td><td><code>u7</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Client Payload Type</td><td><code>u7</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Payload Number</td><td><code>string(1-8)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Payload Name</td><td><code>string(0-32)</code></td><td>-</td><td>As stored. Length 0 if not provided.</td></tr>
+    <tr><td>Number of Tags</td><td><code>u7</code></td><td>0-8</td><td>As stored.</td></tr>
+    <tr class="sub"><td>Tag (repeated)</td><td><code>string(1-16)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Payload Size</td><td><code>u21</code></td><td>0-2,097,151</td><td>Size of the stored Payload in bytes. The Blocks add up to it.</td></tr>
+    <tr><td>NumBlocks</td><td><code>u14</code></td><td>1-16,383</td><td>Number of Retrieve_Data_Block messages that follow.</td></tr>
+    <tr><td>Full Payload Checksum</td><td><code>u32</code></td><td>-</td><td>CRC-32 as supplied with the Store (Section 5.11). The Client checks it after reassembly.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-9"><span class="num">6.9</span>MBSP_Retrieve_Data_Block (Message Type 22)</h3>
+<p><b>Sender:</b> Server. <b>Purpose:</b> carry one Block of the returned Payload. Its layout is identical to MBSP_Store_Data_Block (Section 6.5). The Client checks that it comes from the Server's MUID (C-3). Each Block <span class="rfc">shall</span> be no larger than the Max Block Size of the Request, when one was given. The Server <span class="rfc">shall not</span> send a Block until the Client has asked for it with MBSP_Retrieve_Block_Ack.</p>
+
+<h3 id="s6-10"><span class="num">6.10</span>MBSP_Retrieve_Block_Ack (Message Type 23)</h3>
+<p><b>Sender:</b> Client. <b>Purpose:</b> flow control for a Retrieve. It tells the Server that everything before Block <i>n</i> has been received and that the Client is ready for Block <i>n</i>. It carries the Client MUID and Transaction ID of the Retrieve_Request.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody><tr><td>Next Block Index</td><td><code>u14</code></td><td>0 to NumBlocks</td><td>The Block the Client wants next. NumBlocks means every Block has been received and ends the Transaction.</td></tr></tbody>
+</table>
+<p>The Client sends Retrieve_Block_Ack with Next Block Index 0 after receiving the Retrieve_Header, and with Next Block Index <i>i</i>+1 after receiving Block <i>i</i>, including the last Block. The Client <span class="rfc">may</span> delay an ack until it is ready, for example while it writes the previous Block to memory. The Server matches it to its Retrieve by Client MUID and Transaction ID, and <span class="rfc">shall</span> silently ignore acks that belong to no open Retrieve of its own.</p>
+
+<h3 id="s6-11"><span class="num">6.11</span>MBSP_Query_Request (Message Type 30)</h3>
+<p><b>Sender:</b> Client. <b>Purpose:</b> search a Server's Records. A Record matches when it satisfies every supplied filter (logical AND). The Server replies with one MBSP_Query_Result per matching Record in the requested page, or with MBSP_Status (Not Found) when the page is empty.</p>
+<table class="fields">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Device Match Mode</td><td><code>u7</code></td><td>0-3</td><td>0 = any device; 1 = Manufacturer ID must match (bytes 0-2); 2 = Manufacturer and Family must match (bytes 0-4); 3 = Manufacturer, Family and Model must match (bytes 0-6).</td></tr>
+    <tr><td>Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>Compared as set by Device Match Mode. Always present. Ignored when the mode is 0, when Clients <span class="rfc">should</span> send 7 zero bytes.</td></tr>
+    <tr><td>Device SysEx ID Filter</td><td><code>u7</code></td><td>00h-7Fh</td><td>Match only Records stored with this Client Device SysEx ID. 7Fh = any.</td></tr>
+    <tr><td>Payload Type Filter</td><td><code>u7</code></td><td>-</td><td>A Client Payload Type, matched exactly including the Collection bit, or 7Fh = any.</td></tr>
+    <tr><td>Payload Number Filter</td><td><code>string(0-8)</code></td><td>-</td><td>Exact match, ignoring ASCII case. Length 0 = any.</td></tr>
+    <tr><td>Payload Name Filter</td><td><code>string(0-32)</code></td><td>-</td><td>Substring match, ignoring ASCII case. Length 0 = any. Records without a Payload Name never match a non-empty filter.</td></tr>
+    <tr><td>Number of Tag Filters</td><td><code>u7</code></td><td>0-8</td><td>A Record must carry every listed tag.</td></tr>
+    <tr class="sub"><td>Tag Filter (repeated)</td><td><code>string(1-16)</code></td><td>-</td><td>Exact match, ignoring ASCII case.</td></tr>
+    <tr><td>Start Index</td><td><code>u14</code></td><td>0-16,383</td><td>Zero-based position in the full list of matches at which the page starts.</td></tr>
+    <tr><td>Max Results</td><td><code>u7</code></td><td>1-127</td><td>Largest number of Query_Result messages to return. This is the Client's flow-control window (Section 7.4): a Client <span class="rfc">shall not</span> ask for more results than it can buffer. 1 = one result per request.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-12"><span class="num">6.12</span>MBSP_Query_Result (Message Type 31)</h3>
+<p><b>Sender:</b> Server. <b>Purpose:</b> describe one matching Record. One message is sent per Record in the page, in ascending Result Index order. Query_Results are not acknowledged, and the Server <span class="rfc">shall not</span> send more of them than the Request's Max Results.</p>
+<table class="fields">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Total Matches</td><td><code>u14</code></td><td>1-16,383</td><td>Number of Records matching the filters (not just this page), limited to 16,383.</td></tr>
+    <tr><td>Result Index</td><td><code>u14</code></td><td>-</td><td>Position of this Record in the full list of matches.</td></tr>
+    <tr><td>Record ID</td><td><code>u21</code></td><td>-</td><td>The matching Record.</td></tr>
+    <tr><td>Client Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Client Device Name</td><td><code>string(0-32)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Client Device SysEx ID</td><td><code>u7</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Client Payload Type</td><td><code>u7</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Payload Number</td><td><code>string(1-8)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Payload Name</td><td><code>string(0-32)</code></td><td>-</td><td>As stored. Length 0 if not provided.</td></tr>
+    <tr><td>Number of Tags</td><td><code>u7</code></td><td>0-8</td><td>As stored.</td></tr>
+    <tr class="sub"><td>Tag (repeated)</td><td><code>string(1-16)</code></td><td>-</td><td>As stored.</td></tr>
+    <tr><td>Payload Size</td><td><code>u21</code></td><td>-</td><td>Size of the stored Payload in bytes.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-13"><span class="num">6.13</span>MBSP_Delete_Request (Message Type 40)</h3>
+<p><b>Sender:</b> Client. <b>Purpose:</b> remove a stored Record. The Server replies with MBSP_Status: OK, Not Found or Refused.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Record ID</td><td><code>u21</code></td><td>1-2,097,151</td><td>The Record to delete.</td></tr>
+    <tr><td>Client Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>The requesting device. Servers <span class="rfc">may</span> refuse when it does not match the Record's Owner.</td></tr>
+    <tr><td>Client Device SysEx ID</td><td><code>u7</code></td><td>00h-7Fh</td><td>The requesting unit. Servers <span class="rfc">may</span> refuse when it does not match the Record's Owner.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ===================== 7 Procedures ===================== -->
+<section>
+<h2 id="s7"><span class="num">7</span>Procedures</h2>
+
+<h3 id="s7-1"><span class="num">7.1</span>Discovery</h3>
+<p>A Client finds Servers by sending DiscoverServers to the broadcast MUID and collecting OnlineServer replies for a short period. A wait of 1 second is <span class="rfc">recommended</span>. Each reply gives a Server's MUID (its Source MUID) and its name. A Client <span class="rfc">may</span> also learn of Servers from announcements, which it <span class="rfc">may</span> use at any time (C-2).</p>
+<p>Servers draw a new MUID at power-up (Section 5.5), so a Client <span class="rfc">shall</span> discover the Server it uses before its first Request after the Client powers up, even when it has been configured with a Server Name. It <span class="rfc">should</span> discover again when a Server it was using stops answering, which usually means the Server has restarted with a new MUID. It <span class="rfc">should</span> also follow a Server that announces a new MUID with OnlineServer under the same name.</p>
+<p>If several Servers answer with the same name, a Client <span class="rfc">shall not</span> choose one of them automatically. It <span class="rfc">should</span> tell its user, who can rename one of them, and <span class="rfc">may</span> let the user choose between them by other details, such as their policies.</p>
+<p>OnlineServer tells the Client how to use each Server: which Protocol Version to speak, whether it accepts Stores, Deletes and firmware, whether it needs an Access Key, the largest Store Block it accepts, and roughly how much it can still store. For example, a Client can offer firmware backup only to Servers that accept firmware, and choose a Block size no larger than the Server's Max Store Block Size.</p>
+
+<h3 id="s7-2"><span class="num">7.2</span>Store</h3>
+<figure><svg id="figStore"></svg><figcaption>Figure 2. A successful Store of a Payload in three Blocks, with flow control</figcaption></figure>
+<ol>
+  <li>The Client sends Store_Header and waits. The Server replies with Store_Block_Ack (Next Block Index 0), or with a Status if it cannot accept the Store. A Server that knows it cannot hold Payload Size more bytes <span class="rfc">should</span> reply Storage Full (6) at once, before any Block is sent.</li>
+  <li>The Client sends each Block only when the Server asks for it, in Block Index order. The Server acknowledges every Block except the last (Section 7.4).</li>
+  <li>The Server reassembles the Blocks. If any check below fails, it discards the Transaction and sends Status with the matching code. It answers any further Blocks of that Transaction by repeating that Status (see <b>Lost final Status</b> below):
+    <ul>
+      <li>a Block arrives out of order or after a missing Block: Block Sequence Error (4). A repeat of the Block the Server accepted last is not an error (Section 7.4);</li>
+      <li>no Block arrives within the Transaction Timeout: Transaction Timeout (5);</li>
+      <li>a field is malformed, Payload Size cannot fit in NumBlocks Blocks of the Server's Max Store Block Size, a Block is larger than that size, or the Blocks add up to more or less than Payload Size: Invalid Request (8).</li>
+    </ul>
+  </li>
+  <li>When the last Block has arrived, the Server checks the Full Payload Checksum (failure: Payload Checksum Error, 3), writes the Record, and replies with Status OK carrying the new Record ID. The Record <span class="rfc">shall not</span> become visible to other Requests before this point.</li>
+</ol>
+<p>A Client <span class="rfc">shall</span> choose a Block size that carries the Payload in no more than 16,383 Blocks. Blocks of 128 bytes are enough for a Payload of any size, and every Server accepts Blocks of at least 256 bytes (S-11).</p>
+<p>An empty Payload is stored as one Block of size 0 (NumBlocks = 1). Its Full Payload Checksum is the CRC-32 of no bytes, <code>00000000h</code>. An empty Payload is retrieved the same way (Section 7.3).</p>
+<p>The Server <span class="rfc">may</span> reply with an error Status at any point before the last Block, for example Refused or Busy instead of the first Store_Block_Ack. A Client <span class="rfc">shall</span> stop sending Blocks as soon as it receives a Status for the Transaction. If a Server receives a second Store_Header with the Client MUID and Transaction ID of a Store in progress, it <span class="rfc">should</span> discard the earlier Transaction and start again.</p>
+<p><b>Replacing a Record.</b> A Store_Header with a non-zero Replace Record ID asks the Server to replace that Record instead of creating a new one:</p>
+<ul>
+  <li>When the Store_Header arrives, the Server <span class="rfc">shall</span> reply Not Found (1) if the Record does not exist, and Refused (2) if its policies forbid deleting that Record: a read-only Server, Delete disabled, or Owner-only Delete when the Store does not come from the Record's Owner (Section 8.4). Otherwise the transfer proceeds exactly as for a new Record.</li>
+  <li>The replacement <span class="rfc">shall</span> be atomic. The Record keeps its old Payload and metadata until the last Block has arrived and the Full Payload Checksum has been verified. Only then does the Server replace the Payload and all of the Record's metadata with those of the Store. A Store that fails for any reason leaves the Record unchanged.</li>
+  <li>The Record keeps its Record ID, and the final Status OK carries it. Record IDs held by the Client and by other Clients remain valid and now refer to the new version.</li>
+  <li>A Retrieve of the Record that began before the replacement <span class="rfc">shall</span> return the old Payload and metadata in full, and a Retrieve that begins afterwards returns the new ones. A Client never receives a mixture of the two.</li>
+  <li>If the Record is deleted while the replacement is being transferred, the Server replies Not Found (1) at the end of the transfer.</li>
+  <li>Replacements of the same Record commit one at a time, in the order their transfers complete. Each successful one is answered with Status OK, and the Record holds the Payload and metadata of the one that completed last.</li>
+</ul>
+<p>Replacing a Record is idempotent: repeating the same Store gives the same result, so it combines safely with the recovery of a lost final Status described next.</p>
+<p><b>Lost final Status.</b> If the final Status of a Store is lost, the Client hears nothing after its last Block, so it resends that Block (Section 7.4). The Store has already ended on the Server, so to answer such resends the Server <span class="rfc">shall</span> remember the final Status of every Store Transaction, successful or not, keyed by Client MUID and Transaction ID, for the Completed Store Memory time (Table 9). A Store_Data_Block for a remembered Transaction is answered by sending the same Status again, and changes nothing: in particular, it never creates a second Record. A Server <span class="rfc">may</span> limit how many finished Stores it remembers, but <span class="rfc">should</span> remember at least as many as it allows at once, forgetting the oldest first. A new Store_Header with the same Client MUID and Transaction ID replaces the remembered Transaction.</p>
+<p>A Block for a Store that is neither open nor remembered is answered with Unknown Transaction (9). A Client that receives this after resending its last Block cannot tell whether the Store succeeded, for example because the Server restarted. It <span class="rfc">may</span> Query the Server to find out, or store the Payload again.</p>
+
+<h3 id="s7-3"><span class="num">7.3</span>Retrieve</h3>
+<figure><svg id="figRetrieve"></svg><figcaption>Figure 3. Retrieve of a Record returned in three Blocks, with flow control</figcaption></figure>
+<p>The Server chooses a Block size no larger than the Client's Max Block Size (when given) and no larger than its own limit, and sends Retrieve_Header. The Client answers with Retrieve_Block_Ack (Next Block Index 0) when it is ready, and the Server then sends each Block only when the Client asks for it. The Client's ack after the last Block (Next Block Index = NumBlocks) tells the Server that the transfer is complete. An empty Payload is sent as one Block of size 0. If the Payload cannot be sent in 16,383 Blocks of the Client's Max Block Size, the Server replies Invalid Request (8).</p>
+<p>Retrieve_Header gives the Payload Size before any Block is sent, so a Client can check that the Payload fits in its memory. A Client that cannot accept it does not acknowledge the header. The Server's retries then end the Transaction.</p>
+<p>The Client reassembles the Blocks and checks that they add up to the Payload Size and match the Full Payload Checksum. If either check fails, or the transfer fails after the retries of Section 7.4, the Client discards the data and <span class="rfc">may</span> send a new Retrieve_Request with a new Transaction ID. If the Server gives up after its retries, it sends Status Transaction Timeout (5) with Request Message Type 20.</p>
+
+<h3 id="s7-4"><span class="num">7.4</span>Flow Control and Lost Messages</h3>
+<p>Store and Retrieve use the same lock-step scheme, with one message in flight at a time. In a Store the Client sends Blocks and the Server acknowledges them with Store_Block_Ack. In a Retrieve the roles are reversed: the Server sends Blocks and the Client acknowledges them with Retrieve_Block_Ack. Each ack carries the index of the Block the receiver wants next, so it both confirms what has arrived and grants permission to send one more Block. A receiver that needs time, for example to write a Block to flash memory, simply sends its ack later.</p>
+<p>Version 1 deliberately keeps one Block in flight, so that a receiver never needs to buffer more than one Block. The cost is one round trip per Block, which is small on DIN and USB (Section 11.1). A windowed scheme, in which the receiver grants several Blocks at once, would suit high-latency links such as network MIDI, and may be added in a future version. A Client would learn of it from the Supported Versions in OnlineServer.</p>
+<p>The <b>sender</b> of the Blocks (the Client in a Store, the Server in a Retrieve):</p>
+<ul>
+  <li><span class="rfc">shall</span> send the header first, and then a Block only when an ack asks for exactly that Block;</li>
+  <li><span class="rfc">shall</span> ignore any ack other than the one for the message it sent last. Late or duplicated acks are therefore harmless;</li>
+  <li><span class="rfc">should</span> resend its last message (the header or the last Block) if no ack arrives within the Ack Timeout, and <span class="rfc">should</span> give up after Max Retries resends. A Client gives up by abandoning the Store; a Server gives up by sending Status Transaction Timeout (5).</li>
+</ul>
+<p>The <b>receiver</b> of the Blocks:</p>
+<ul>
+  <li><span class="rfc">shall</span> acknowledge the header and every Block it accepts, as described in Sections 6.6 and 6.10;</li>
+  <li><span class="rfc">shall</span>, on receiving again the header or the Block it accepted last (because its ack was lost), discard the repeat and send the same ack again;</li>
+  <li><span class="rfc">shall</span> treat any other out-of-order Block as an error: a Server replies Block Sequence Error (4), and a Client abandons the Retrieve;</li>
+  <li>in a Store, <span class="rfc">shall</span> answer a resent Block that arrives after the Transaction has ended by repeating the final Status (Section 7.2). The last Block is answered by the final Status instead of an ack, so this is how a lost final Status is recovered.</li>
+</ul>
+<p><b>Queries use paging instead of acks.</b> Query_Result messages are not acknowledged. Instead, the Client's Max Results sets the most Query_Results that can arrive in one burst, and the Client asks for the next page only when it is ready. A Client that can handle only one result at a time uses Max Results = 1, which gives the same one-message-at-a-time pacing as the Block acks. This keeps Queries stateless on the Server: it answers each Query_Request and keeps nothing afterwards, so it needs no timers or resends for Queries. A lost Query_Result is recovered by requesting the same page again (Section 7.5).</p>
+<p>The Server's pause between Query_Results (S-8) is a courtesy that eases bursts on slow links. Clients <span class="rfc">shall not</span> rely on it, because results may arrive back to back, particularly over USB.</p>
+
+<h3 id="s7-5"><span class="num">7.5</span>Query and Paging</h3>
+<figure><svg id="figQuery"></svg><figcaption>Figure 4. A Query returning the first page of three results out of 40 matches</figcaption></figure>
+<p>The Server orders matching Records by ascending Record ID, so that pages stay consistent between Requests, and returns the matches from Start Index up to Max Results. The Client knows the page is complete when it has received the Result with</p>
+<pre class="bytes">Result Index = min(Start Index + Max Results, Total Matches) - 1</pre>
+<p>To read the next page, the Client sends a new Query_Request with Start Index advanced by the number of results received. If a Result Index is missing when the Client's reply wait ends, a Query_Result was lost: the Client <span class="rfc">may</span> send the same Query_Request again (with a new Transaction ID) and keep the results it is missing. Because Records are listed in ascending Record ID order and new Records always receive higher Record IDs (Section 5.6), Records stored during paging appear only after the existing ones, and a replaced Record keeps its position. Only a Record deleted from an earlier page shifts the pages that follow, which can make a Client skip one Record. A Server <span class="rfc">shall</span> reply with Status Not Found (1) when no Record falls in the requested page, and <span class="rfc">shall not</span> send a Query_Result whose Result Index would exceed 16,383.</p>
+
+<h3 id="s7-6"><span class="num">7.6</span>Delete</h3>
+<p>The Client sends Delete_Request with the Record ID and its own Device Identity and SysEx ID. The Server replies with Status OK, Not Found, or Refused. A Server <span class="rfc">may</span> refuse every Delete (for example an archival or read-only Server), and <span class="rfc">may</span> refuse a Delete that does not come from the Record's Owner (Section 8.4).</p>
+
+<h3 id="s7-7"><span class="num">7.7</span>Timeouts</h3>
+<table class="keep">
+  <caption>Table 9. Recommended timeouts</caption>
+  <thead><tr><th style="width:38%">Timer</th><th style="width:16%">Value</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr><td>Sender: Ack Timeout</td><td>1 s</td><td>Time the sender of Blocks waits for an ack before resending its last message (Section 7.4).</td></tr>
+    <tr><td>Sender: Max Retries</td><td>3</td><td>Resends of one message before the sender gives up.</td></tr>
+    <tr><td>Server: Store Transaction Timeout</td><td>5 s</td><td>Time allowed between consecutive Store messages of one Transaction. On expiry, reply Status 5 and discard the Transaction. It is longer than Ack Timeout &times; (Max Retries + 1), so a Client's resends arrive in time.</td></tr>
+    <tr><td>Server: Completed Store Memory</td><td>10 s</td><td>How long a Server remembers the final Status of a finished Store, to repeat it if the Client resends a Block (Section 7.2). It <span class="rfc">shall</span> be longer than Ack Timeout &times; (Max Retries + 1), so that every resend of the last Block is answered.</td></tr>
+    <tr><td>Client: reply wait</td><td>5 s</td><td>Time to wait for the first Reply, and between Retrieve messages or Query_Results, before giving up.</td></tr>
+    <tr><td>Client: discovery wait</td><td>1 s</td><td>Time to collect OnlineServer replies.</td></tr>
+  </tbody>
+</table>
+<p>Values <span class="rfc">should</span> be configurable. Slow links or large Blocks may need longer values (Section 11.1). A receiver that delays its acks for longer than the sender's Ack Timeout causes harmless resends, which it answers by repeating its ack.</p>
+</section>
+
+<!-- ===================== 8 Server requirements ===================== -->
+<section>
+<h2 id="s8"><span class="num">8</span>Server Requirements</h2>
+<p>A Server implements every message in this specification, although its policies may refuse some Requests. A Client implements discovery and any of the operations it needs: a Client that only backs up its data, for example, needs only Store. Table 10 summarizes what each role implements.</p>
+<table class="keep">
+  <caption>Table 10. Conformance summary</caption>
+  <thead><tr><th style="width:30%">Capability</th><th style="width:35%">Server</th><th>Client</th></tr></thead>
+  <tbody>
+    <tr><td>Discovery</td><td>Required: answer DiscoverServers</td><td>Required: discover the Server it uses (C-13)</td></tr>
+    <tr><td>Store, including replacement</td><td>Required; may refuse by policy</td><td>Optional</td></tr>
+    <tr><td>Retrieve</td><td>Required</td><td>Optional</td></tr>
+    <tr><td>Query</td><td>Required</td><td>Optional</td></tr>
+    <tr><td>Delete</td><td>Required; may refuse by policy</td><td>Optional</td></tr>
+    <tr><td>Flow control and lost-message recovery</td><td>Required (Section 7.4)</td><td>Required for each operation it implements</td></tr>
+    <tr><td>Full Payload Checksum</td><td>Required: check every Store</td><td>Required: check every Retrieve (C-5)</td></tr>
+    <tr><td>Announcements (Beacon Mode)</td><td>Optional, off by default</td><td>Accept them (C-2)</td></tr>
+    <tr><td>Access Key</td><td>Optional</td><td>Send the key a Server requires</td></tr>
+    <tr><td>Firmware storage</td><td>Policy, refused by default</td><td>Optional; user confirmation required</td></tr>
+    <tr><td>Reserved and manufacturer-defined Categories</td><td>Required: store as opaque data (S-10)</td><td>Optional</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s8-1"><span class="num">8.1</span>Reception</h3>
+<ul class="req">
+  <li><span class="id">S-1</span><span>A Server <span class="rfc">shall</span> apply the reception rules of Section 4.8.</span></li>
+  <li><span class="id">S-2</span><span>A Server <span class="rfc">shall</span> silently ignore Server-to-Client messages (Message Types 1, 2, 12, 21, 22 and 31), so that other Servers' traffic and MIDI loops do no harm.</span></li>
+  <li><span class="id">S-3</span><span>A Server <span class="rfc">shall</span> silently ignore a message whose Destination MUID is not its own, except DiscoverServers sent to the broadcast MUID (Section 4.8).</span></li>
+  <li><span class="id">S-4</span><span>A Server <span class="rfc">shall</span> reply with Status Invalid Request (8) to a Request addressed to it whose payload is malformed: a field out of range, non-printable characters, missing bytes or extra bytes after the last field.</span></li>
+  <li><span class="id">S-5</span><span>A Server <span class="rfc">shall</span> silently ignore a message whose Message Type it does not implement (Section 4.8).</span></li>
+</ul>
+
+<h3 id="s8-2"><span class="num">8.2</span>Replies</h3>
+<ul class="req">
+  <li><span class="id">S-6</span><span>Every Reply <span class="rfc">shall</span> be sent from the Server's MUID to the Client MUID of the Request it answers, with the same Transaction ID.</span></li>
+  <li><span class="id">S-7</span><span>A Server <span class="rfc">shall</span> send no more than one final Status for each Store Transaction, apart from repeating it unchanged in answer to a resent Block (Section 7.2). For each Retrieve_Request it accepts, it <span class="rfc">shall</span> answer with either a Status or a Retrieve_Header (which it may resend under Section 7.4), and <span class="rfc">shall</span> send at most one final Status.</span></li>
+  <li><span class="id">S-8</span><span>A Server <span class="rfc">should</span> pause between consecutive Query_Result messages, which are not acknowledged. The pause <span class="rfc">should</span> be configurable; 20 ms is a reasonable default.</span></li>
+</ul>
+
+<h3 id="s8-3"><span class="num">8.3</span>Records and Transfers</h3>
+<ul class="req">
+  <li><span class="id">S-9</span><span>A Server <span class="rfc">shall</span> store the Payload and all metadata exactly as received and return them unchanged.</span></li>
+  <li><span class="id">S-10</span><span>A Server <span class="rfc">shall</span> accept Payload Types with reserved and manufacturer-defined Categories and store them as opaque data.</span></li>
+  <li><span class="id">S-11</span><span>A Server <span class="rfc">shall</span> announce a Max Store Block Size of at least 256 bytes and accept Store Blocks of any size up to it, and <span class="rfc">shall</span> accept Payloads of up to 2,097,151 bytes unless it replies Storage Full.</span></li>
+  <li><span class="id">S-12</span><span>A Server <span class="rfc">should</span> keep Records across power cycles and <span class="rfc">should</span> offer its user a way to back up and restore all Records. A Server that keeps Records across power cycles <span class="rfc">should</span> commit each Store and each replacement so that a power failure leaves either the old Record or the new one, never a mixture.</span></li>
+  <li><span class="id">S-13</span><span>A Server <span class="rfc">shall</span> follow the flow control of Section 7.4: acknowledge every Store_Header and Store Block it accepts, and send each Retrieve Block only when the Client asks for it.</span></li>
+  <li><span class="id">S-14</span><span>A Server <span class="rfc">shall</span> remember the final Status of each Store Transaction for the Completed Store Memory time and send it again, unchanged, in answer to a Store_Data_Block of that Transaction. It <span class="rfc">shall</span> reply with Status Unknown Transaction (9) to a Store_Data_Block addressed to it that belongs to no open or remembered Store Transaction.</span></li>
+  <li><span class="id">S-15</span><span>A Server <span class="rfc">shall</span> answer DiscoverServers whatever its Protocol Version, with an OnlineServer sent with Protocol Version 1 that lists every Protocol Version it implements and gives Policy Flags and limits matching its current configuration (Sections 4.2 and 6.2).</span></li>
+  <li><span class="id">S-16</span><span>A Server <span class="rfc">shall</span> generate its MUID as described in Section 5.5, and on detecting a MUID collision <span class="rfc">shall</span> draw a new MUID and announce it by broadcasting OnlineServer.</span></li>
+  <li><span class="id">S-17</span><span>A Server <span class="rfc">should</span> give itself a default Server Name that is unlikely to match another unit's (Section 5.1).</span></li>
+  <li><span class="id">S-18</span><span>A Server <span class="rfc">shall</span> replace a Record only when a Store_Header names it in Replace Record ID, <span class="rfc">shall</span> apply the Delete policies to the replacement, and <span class="rfc">shall</span> make the replacement atomic, keeping the Record ID (Section 7.2).</span></li>
+  <li><span class="id">S-19</span><span>A Server <span class="rfc">shall</span> give each new Record a Record ID higher than any it has assigned before (Section 5.6).</span></li>
+  <li><span class="id">S-20</span><span>A Server <span class="rfc">shall</span> reply Invalid Request (8) to a Store whose Blocks do not add up to its Payload Size, and to a Retrieve whose Payload cannot be sent in 16,383 Blocks of the requested Max Block Size (Sections 7.2 and 7.3).</span></li>
+</ul>
+
+<h3 id="s8-4"><span class="num">8.4</span>Policies</h3>
+<p>A Server <span class="rfc">may</span> offer the following policies, each of which results in Status Refused (2). It <span class="rfc">shall</span> report the policies in force in the Policy Flags of OnlineServer (Table 8).</p>
+<ul>
+  <li><b>Read-only:</b> refuse every Store, including replacements, and every Delete.</li>
+  <li><b>No Delete:</b> refuse Delete, and refuse any Store that replaces a Record, since replacing removes the Record's previous contents.</li>
+  <li><b>Owner-only Delete:</b> refuse a Delete, or a Store that replaces a Record, whose Device Identity (all 7 bytes) and Client Device SysEx ID do not both match the Record's Owner. This is <span class="rfc">recommended</span> as the default.</li>
+  <li><b>Access Key:</b> refuse Requests without the configured Access Key (Section 4.4).</li>
+  <li><b>No Firmware:</b> refuse Stores of Category 0Eh (Firmware / OS). This is <span class="rfc">recommended</span> as the default, because a corrupt or mismatched firmware image sent back to a device may make it unusable.</li>
+</ul>
+<p>These policies apply to MBSP Requests. A Server's own user interface <span class="rfc">may</span> manage any Record.</p>
+<p>A Server <span class="rfc">may</span> limit how many Transactions it handles at once and reply Busy (7) beyond that limit.</p>
+
+<!-- ===================== 9 Client requirements ===================== -->
+<h2 id="s9"><span class="num">9</span>Client Requirements</h2>
+<ul class="req">
+  <li><span class="id">C-1</span><span>A Client <span class="rfc">shall</span> generate its MUID as described in Section 5.5, use it as the Source MUID of every Request, and draw a new MUID when it detects a collision.</span></li>
+  <li><span class="id">C-2</span><span>A Client <span class="rfc">shall</span> ignore messages whose Destination MUID is neither its own nor the broadcast MUID, and Replies whose Transaction ID belongs to no open Transaction. Announcements are the exception: a Client <span class="rfc">may</span> use an OnlineServer sent to the broadcast MUID at any time (Sections 5.5 and 6.2).</span></li>
+  <li><span class="id">C-3</span><span>A Client <span class="rfc">shall</span> ignore Replies whose Source MUID is not the MUID of the Server it addressed.</span></li>
+  <li><span class="id">C-4</span><span>A Client <span class="rfc">should</span> tolerate duplicate Replies, which can occur on networks with mergers or loops, by ignoring a Reply that repeats one already received for the same Transaction (for example a Query_Result with a Result Index already received).</span></li>
+  <li><span class="id">C-5</span><span>A Client <span class="rfc">shall</span> check every retrieved Payload before using it: the Retrieve_Header's Record ID is the one requested, the Blocks add up to its Payload Size, and the Full Payload Checksum matches.</span></li>
+  <li><span class="id">C-6</span><span>A Client <span class="rfc">shall</span> send a correct Device Identity, and <span class="rfc">should</span> send a Client Device Name and its SysEx Device ID when it has them.</span></li>
+  <li><span class="id">C-7</span><span>A Client <span class="rfc">shall</span> use timeouts so that a missing Server or a lost message never leaves it waiting indefinitely.</span></li>
+  <li><span class="id">C-8</span><span>A Client <span class="rfc">should</span> ask its user to confirm before loading a retrieved Payload that would replace data on the device.</span></li>
+  <li><span class="id">C-9</span><span>A Client <span class="rfc">shall</span> follow the flow control of Section 7.4: send each Store Block only when the Server asks for it, and acknowledge every Retrieve_Header and Retrieve Block it receives.</span></li>
+  <li><span class="id">C-10</span><span>A Client <span class="rfc">shall</span> set Max Results no higher than the number of Query_Results it can receive back to back, and <span class="rfc">shall not</span> rely on the Server pausing between them (Section 7.4).</span></li>
+  <li><span class="id">C-11</span><span>A Client <span class="rfc">shall not</span> send Store Blocks larger than the Server's Max Store Block Size (Section 6.2).</span></li>
+  <li><span class="id">C-12</span><span>A Client <span class="rfc">shall</span> ignore any bytes after the OnlineServer fields it knows, and <span class="rfc">shall</span> ignore reserved Policy Flags (Section 4.2).</span></li>
+  <li><span class="id">C-13</span><span>A Client <span class="rfc">shall</span> discover the Server it uses before its first Request after power-up, <span class="rfc">shall not</span> choose automatically between Servers with the same name, and <span class="rfc">should</span> rediscover a Server that stops answering (Section 7.1).</span></li>
+</ul>
+</section>
+
+<!-- ===================== 10 Security ===================== -->
+<section>
+<h2 id="s10"><span class="num">10</span>Security Considerations</h2>
+<p>MIDI 1.0 offers no confidentiality, integrity protection or authentication, and MBSP Version 1 does not add them. Implementers and users should be aware of the following:</p>
+<ul>
+  <li><b>No authentication.</b> Any device on the network can send any Request. Owner checks (for Delete and Replace) rely on Device Identity and SysEx ID, which any device can claim. They prevent accidents, not deliberate misuse.</li>
+  <li><b>Access Key in clear text.</b> The Access Key is visible to every device on the network and should be treated as a convenience, not a password.</li>
+  <li><b>Integrity of control messages.</b> Payloads are protected end to end by a CRC-32, but other fields are protected only by the 7-bit Message Checksum. An error that changes two or more bytes of a message can occasionally pass that check, for example turning a Delete_Request into a Delete of a different Record ID. Such errors are rare on MIDI links, and Owner-only Delete limits the damage to the requesting device's own Records.</li>
+  <li><b>Advisory OnlineServer.</b> Policy Flags and limits are not authenticated, and any device can send OnlineServer under any Server Name.</li>
+  <li><b>MUIDs are not authenticated.</b> A device that sends messages using another device's MUID makes that device draw a new MUID (Section 5.5), which interrupts its open Transactions.</li>
+  <li><b>Untrusted Payloads.</b> A retrieved Payload may have been stored by another device or altered on the Server. Clients must validate data before loading it, and should take particular care with anything that changes firmware or calibration. The CRC-32 detects accidental corruption only: anyone who alters a Payload can supply a matching checksum.</li>
+  <li><b>Firmware.</b> Servers should refuse firmware by default (Section 8.4). A Client should never apply firmware retrieved over MBSP without the user's explicit confirmation.</li>
+  <li><b>Denial of service.</b> A misbehaving device can flood the network or open many Transactions. Servers should limit concurrent Transactions and apply timeouts.</li>
+  <li><b>Privacy.</b> Patch names, tags and set lists may reveal information about a user's work. Server operators should treat exported databases accordingly.</li>
+</ul>
+<p>Future versions may define authentication within an MBSP extension (Sub-ID #2 other than 00h).</p>
+</section>
+
+<!-- ===================== 11 Implementation guidance ===================== -->
+<section>
+<h2 id="s11"><span class="num">11</span>Implementation Guidance</h2>
+
+<h3 id="s11-1"><span class="num">11.1</span>Block Size and Pacing</h3>
+<p>A MIDI 1.0 DIN connection carries 3,125 bytes per second. Each Data Block message adds 24 bytes of overhead when no Access Key is used: 20 for the envelope and 4 for Block Index and Block Size. Table 11 shows the resulting transfer times. Acks travel on the return connection, so they do not use the sending direction's bandwidth, but each Block waits for one round trip: a 22-byte ack takes about 7 ms on DIN, plus the receiver's own processing time. With 256-byte Blocks this adds roughly 8% to the times below.</p>
+<table class="keep">
+  <caption>Table 11. Approximate transfer time over MIDI 1.0 DIN</caption>
+  <thead><tr><th>Payload</th><th>Block size</th><th class="c">Blocks</th><th class="c">Bytes sent</th><th class="c">Time</th></tr></thead>
+  <tbody>
+    <tr><td>Single patch, 512 bytes</td><td>256</td><td class="c">2</td><td class="c">560</td><td class="c">0.18 s</td></tr>
+    <tr><td>Voice bank, 4,096 bytes</td><td>256</td><td class="c">16</td><td class="c">4,480</td><td class="c">1.4 s</td></tr>
+    <tr><td>Project, 32,768 bytes</td><td>256</td><td class="c">128</td><td class="c">35,840</td><td class="c">11.5 s</td></tr>
+    <tr><td>Project, 32,768 bytes</td><td>1,024</td><td class="c">32</td><td class="c">33,536</td><td class="c">10.7 s</td></tr>
+  </tbody>
+</table>
+<p>Larger Blocks reduce overhead only slightly, while many devices and MIDI interfaces have small System Exclusive buffers. Because of flow control, a receiver never has to hold more than one Block at a time. Clients <span class="rfc">should</span> choose Block sizes their own receive buffers can hold when retrieving, and <span class="rfc">should</span> prefer Blocks of 256 bytes or less when sending over DIN or through older interfaces. Servers announce the largest Store Block they accept in OnlineServer.</p>
+<p>A Query_Result is typically 50 to 90 bytes long, and at most 251 bytes (32-character Device and Payload Names and eight 16-character tags). A full page of 127 typical results therefore takes about 2 to 4 seconds to arrive over DIN, but can arrive almost at once over USB. Clients with small receive buffers <span class="rfc">should</span> keep Max Results small (Section 7.4).</p>
+
+<h3 id="s11-2"><span class="num">11.2</span>Payload Encoding</h3>
+<p>Payload bytes travel inside System Exclusive and are therefore 7-bit. MBSP does not define how a device encodes its data into a Payload: each manufacturer packs Payloads however it chooses, and the Server stores them as opaque bytes. Only the device that wrote a Payload, or another device that understands the same format, needs to decode it.</p>
+<p>In practice, most device data already exists as the 7-bit body of the device's own System Exclusive dumps and can be stored as it is. A device with 8-bit data may use any 7-bit encoding, for example the common scheme that packs 7 bytes into 8 with their high bits gathered in a leading byte. Manufacturers are encouraged to reuse the encoding of their existing System Exclusive dumps, so the same data can move between MBSP and their other tools unchanged.</p>
+
+<h3 id="s11-3"><span class="num">11.3</span>Use over MIDI 2.0</h3>
+<p>MBSP messages are MIDI 1.0 System Exclusive messages and can be carried unchanged over MIDI 2.0 Universal MIDI Packet transports in Data 64 (System Exclusive 7-bit) messages. No MIDI 2.0-specific behavior is defined in this version.</p>
+<p>The choice of UMP Group, and any routing between Groups, are matters for the transport, outside this specification. A Client and a Server can communicate only if they use the same Group or the transport routes between their Groups. As on MIDI 1.0 (Section 3.2), discovery reaches only the devices that the routing connects.</p>
+
+<h3 id="s11-4"><span class="num">11.4</span>Relationship to MIDI-CI</h3>
+<p>MBSP borrows the MUID concept from MIDI Capability Inquiry, including Source and Destination MUIDs in every message, but does not require MIDI-CI, so that it can be implemented on MIDI 1.0 devices that lack MIDI-CI support. MIDI-CI Property Exchange addresses a different need: a controller reading and setting properties of a device. MBSP lets a device save its own data to a third party. A future version could advertise MBSP support through MIDI-CI Profile or Property Exchange mechanisms.</p>
+<p>MBSP MUIDs follow MIDI-CI's format: the same 28-bit range, the same broadcast value <code>0FFFFFFFh</code> and the same reserved range <code>0FFFFF00h</code>-<code>0FFFFFFEh</code>. MBSP and MIDI-CI messages are distinct, so neither protocol sees the other's MUIDs. A device that implements both <span class="rfc">may</span> use one MUID for both, provided it draws a new one for both when either protocol detects a collision. Such a device <span class="rfc">shall</span> follow MIDI-CI's rules for generating that MUID, and therefore <span class="rfc">shall not</span> keep it across power cycles as Section 5.5 otherwise allows a Server to do.</p>
+</section>
+
+<!-- ===================== 12 Open issues ===================== -->
+<section>
+<h2 id="s12"><span class="num">12</span>Open Issues for Review</h2>
+<p>The proposer requests the reviewers' guidance on the following points.</p>
+<div class="note issue"><b>Issue 1</b>Assignment of a Universal Non-Real Time Sub-ID #1 for MBSP. The draft uses 6Ah as a placeholder (Section 13).</div>
+<div class="note issue"><b>Issue 2</b>Ownership of identical units. A Record's Owner is the Device Identity and SysEx Device ID, so identical units that send no SysEx Device ID share one Owner (Section 5.4). Should a future version add an optional persistent identifier for each unit, such as a Client Instance ID, which would also distinguish several independent Clients in one device?</div>
+<div class="note issue"><b>Issue 3</b>Character set. Names and tags are limited to printable ASCII (Section 2.3), which suits most instrument displays but not every market. Should a future version allow UTF-8, and if so, how should a Client that can display only ASCII show such names?</div>
+<div class="note issue"><b>Issue 4</b>Access Key. The Access Key is sent in clear text and offers convenience rather than security (Section 10). Is it worth keeping in Version 1, or should access control be left to a future authenticated extension?</div>
+
+<!-- ===================== 13 Assignments ===================== -->
+<h2 id="s13"><span class="num">13</span>Requested Assignments</h2>
+<p>This proposal requests the following assignment from the MMA and AMEI, and asks them to manage the reserved Payload Type Categories:</p>
+<table class="keep">
+  <thead><tr><th style="width:38%">Item</th><th style="width:22%">Requested</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Universal Non-Real Time System Exclusive Sub-ID #1 for the MIDI Bulk Storage Protocol</td><td>Any free value (draft uses 6Ah)</td><td>Sub-ID #2 values are managed within MBSP: 00h is the base protocol, and other values are reserved for MBSP extensions.</td></tr>
+    <tr><td>Payload Type Categories 0Fh-2Fh</td><td>Held in reserve</td><td>Reserved Categories are assigned only by future revisions of this specification, through the MMA and AMEI. Manufacturers use Categories 30h-3Eh for their own data.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ===================== Appendix A ===================== -->
+<section class="chapter">
+<h2 id="sA"><span class="num">Appendix A</span>Example Messages</h2>
+<p>These examples were produced by the reference implementation (Appendix B). All use Client MUID <code>0123456h</code> (sent as <code>56 68 48 00</code>), Server MUID <code>0654321h</code> (sent as <code>21 06 15 03</code>), no Access Key, and the Server Name "StudioVault".</p>
+
+<h4>A.1 DiscoverServers (Transaction ID 1)</h4>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 7F 7F 7F 7F 01 00 00 15 F7</pre>
+<table class="keep">
+  <thead><tr><th style="width:42%">Bytes</th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">F0 7E 7F 6A 00</td><td>Start of Exclusive, Universal Non-Real Time, All Call, MBSP, base protocol</td></tr>
+    <tr><td class="mono">01</td><td>Protocol Version 1</td></tr>
+    <tr><td class="mono">00</td><td>Access Key Length 0</td></tr>
+    <tr><td class="mono">56 68 48 00</td><td>Source MUID: the Client</td></tr>
+    <tr><td class="mono">7F 7F 7F 7F</td><td>Destination MUID: broadcast</td></tr>
+    <tr><td class="mono">01 00</td><td>Transaction ID 1</td></tr>
+    <tr><td class="mono">00</td><td>Message Type 0, with an empty payload</td></tr>
+    <tr><td class="mono">15 F7</td><td>Message Checksum (Section 4.7), End of Exclusive</td></tr>
+  </tbody>
+</table>
+
+<h4>A.2 OnlineServer reply</h4>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 56 68 48 00 01 00 01 0B 53 74 75 64 69 6F 56 61 75 6C 74 01 01 04 00 08 00 00 00 04 30 F7</pre>
+<table class="keep">
+  <thead><tr><th style="width:42%">Bytes</th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">21 06 15 03</td><td>Source MUID: the Server (the Client learns it from here)</td></tr>
+    <tr><td class="mono">56 68 48 00</td><td>Destination MUID: the Client</td></tr>
+    <tr><td class="mono">0B 53 ... 74</td><td>Server Name "StudioVault" (length 11)</td></tr>
+    <tr><td class="mono">01 01</td><td>1 Supported Version: Protocol Version 1</td></tr>
+    <tr><td class="mono">04</td><td>Policy Flags: Owner-only Delete (bit 2). Stores accepted, firmware refused, no Access Key.</td></tr>
+    <tr><td class="mono">00 08</td><td>Max Store Block Size 1,024</td></tr>
+    <tr><td class="mono">00 00 00 04</td><td>Free Space 8,388,608 bytes (8 MiB)</td></tr>
+    <tr><td class="mono">30</td><td>Message Checksum</td></tr>
+  </tbody>
+</table>
+
+<h4>A.3 OnlineServer beacon</h4>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 7F 7F 7F 7F 00 00 01 0B 53 74 75 64 69 6F 56 61 75 6C 74 01 01 04 00 08 00 00 00 04 3B F7</pre>
+<p>The same payload as A.2, sent to the broadcast MUID <code>7F 7F 7F 7F</code> with Transaction ID 0.</p>
+
+<h4>A.4 Store_Header (Transaction ID 2)</h4>
+<p>Stores a 5-byte Patch named "JunoPad", number "B22", tag "Pad", in one Block, from a device with Manufacturer ID 41h, family code bytes <code>06 01</code> and model code bytes <code>00 00</code> (as in its Device Inquiry reply), Device Name "Juno" and SysEx ID 10h:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 02 00 0A 00 00 00 41 00 00 06 01 00 00 04 4A 75 6E 6F 10 01 03 42 32 32 07 4A 75 6E 6F 50 61 64 01 03 50 61 64 05 00 00 01 00 58 3A 0A 2F 0F 74 F7</pre>
+<table class="keep">
+  <thead><tr><th style="width:42%">Bytes</th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">56 68 48 00 21 06 15 03</td><td>From the Client to the Server</td></tr>
+    <tr><td class="mono">02 00 0A</td><td>Transaction ID 2, Message Type 10</td></tr>
+    <tr><td class="mono">00 00 00</td><td>Replace Record ID 0: store a new Record</td></tr>
+    <tr><td class="mono">41 00 00 06 01 00 00</td><td>Device Identity</td></tr>
+    <tr><td class="mono">04 4A 75 6E 6F</td><td>Device Name "Juno"</td></tr>
+    <tr><td class="mono">10</td><td>SysEx ID 10h</td></tr>
+    <tr><td class="mono">01</td><td>Payload Type: Patch</td></tr>
+    <tr><td class="mono">03 42 32 32</td><td>Payload Number "B22"</td></tr>
+    <tr><td class="mono">07 4A 75 6E 6F 50 61 64</td><td>Payload Name "JunoPad"</td></tr>
+    <tr><td class="mono">01 03 50 61 64</td><td>1 tag: "Pad"</td></tr>
+    <tr><td class="mono">05 00 00</td><td>Payload Size 5</td></tr>
+    <tr><td class="mono">01 00</td><td>NumBlocks 1</td></tr>
+    <tr><td class="mono">58 3A 0A 2F 0F</td><td>Full Payload Checksum: CRC-32 <code>F5E29D58h</code> of the Payload <code>10 22 7F 00 45</code></td></tr>
+    <tr><td class="mono">74</td><td>Message Checksum</td></tr>
+  </tbody>
+</table>
+
+<h4>A.5 Store_Data_Block</h4>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 02 00 0B 00 00 05 00 10 22 7F 00 45 4B F7</pre>
+<p>Block Index 0 (<code>00 00</code>), Block Size 5 (<code>05 00</code>), then the Payload.</p>
+
+<h4>A.6 Store_Block_Ack: "send Block 0"</h4>
+<p>The Server's reply to the Store_Header of A.4, before the Client sends A.5:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 56 68 48 00 02 00 0C 00 00 45 F7</pre>
+<p>From the Server to the Client, Message Type <code>0C</code> (12), Next Block Index <code>00 00</code>. The single Block of A.5 is the last Block, so it is answered by the Status of A.8 rather than another ack.</p>
+
+<h4>A.7 Retrieve_Block_Ack: "send Block 1"</h4>
+<p>A Client's ack after receiving Block 0 of a Retrieve (Transaction ID 2):</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 02 00 17 01 00 39 F7</pre>
+<p>From the Client to the Server, Message Type <code>17</code> (23), Next Block Index <code>01 00</code>.</p>
+
+<h4>A.8 Status: Store OK, Record ID 42</h4>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 56 68 48 00 02 00 02 0A 00 2A 00 00 1B F7</pre>
+<p>Request Message Type <code>0A</code> (Store), Status <code>00</code> (OK), Record ID <code>2A 00 00</code> (42).</p>
+
+<h4>A.9 Status: Unknown Transaction</h4>
+<p>The reply to a Store_Data_Block sent with Transaction ID 3, for which no Store is open or remembered:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 56 68 48 00 03 00 02 0A 09 00 00 00 3B F7</pre>
+<p>Request Message Type <code>0A</code> (Store), Status <code>09</code> (Unknown Transaction), Record ID 0.</p>
+
+<h4>A.10 Store_Header replacing Record 42 (Transaction ID 4)</h4>
+<p>The same device saves a tweaked version of the patch of A.4, now stored as Record 42 (A.8). The new Payload is <code>10 23 7F 01 45</code>:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 04 00 0A 2A 00 00 41 00 00 06 01 00 00 04 4A 75 6E 6F 10 01 03 42 32 32 07 4A 75 6E 6F 50 61 64 01 03 50 61 64 05 00 00 01 00 7C 16 17 22 05 52 F7</pre>
+<p>Replace Record ID <code>2A 00 00</code> (42), and Full Payload Checksum <code>7C 16 17 22 05</code> (CRC-32 <code>5445CB7Ch</code> of the new Payload). After the Block has been transferred, the Server replies with Status OK carrying the same Record ID:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 56 68 48 00 04 00 02 0A 00 2A 00 00 19 F7</pre>
+</section>
+
+<!-- ===================== Appendix B ===================== -->
+<section class="keep">
+<h2 id="sB"><span class="num">Appendix B</span>Reference Implementations</h2>
+<p>Three open implementations accompany this proposal. The first two were used to check every example and procedure in this document:</p>
+<ul>
+  <li><b>WebMIDI Server.</b> A complete MBSP Server that runs in a web browser using the Web MIDI API, with records kept in the browser's database, import and export of the whole database, a record browser, and a built-in protocol self-test.</li>
+  <li><b>Studio Client.</b> A test Client that emulates a studio of ten devices, including two units of the same model, and exercises every message, every Query filter, and the error cases (bad checksums, missing Blocks, Data Blocks for no open Store, lost final Status replies, replacement of stored Records, unknown Records, unknown Message Types, messages for other MUIDs, Server Names shared by two Servers, invalid fields and firmware refusal), verifying every reply byte for byte.</li>
+  <li><b>TouchOSC Snapshot Panel.</b> A small demonstration Client built as a TouchOSC control surface, with faders, knobs, an XY pad, toggles and a mode selector. Its Save button stores a snapshot of the controls on an MBSP Server, and its Load button lists the panel's snapshots and restores the one the user taps. It discovers every Server on the network and lets the user choose between them.</li>
+</ul>
+<p>The Server and the Studio Client share one protocol codec. In testing over a MIDI loopback, the Client completed more than 450 randomized operations against the Server, with up to six devices active at once, without a protocol error. The TouchOSC panel was tested live with two Servers on the network, discovering both and saving to and restoring from the one selected. In automated tests it also ran against two Servers at once, storing on each separately.</p>
+</section>
+
+<script>
+  // ---- Sequence diagrams (drawn before printing) ----
+  function seq(id, steps) {
+    const W = 640, top = 46, row = 30, cx = 150, sx = 490;
+    const svg = document.getElementById(id);
+    const H = top + steps.length * row + 16;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('role', 'img');
+    const ns = 'http://www.w3.org/2000/svg';
+    const el = (name, attrs, text) => {
+      const e = document.createElementNS(ns, name);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      if (text) e.textContent = text;
+      svg.appendChild(e); return e;
+    };
+    const defs = el('defs', {});
+    const m = document.createElementNS(ns, 'marker');
+    for (const [k, v] of Object.entries({ id: id + 'a', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' })) m.setAttribute(k, v);
+    const p = document.createElementNS(ns, 'path'); p.setAttribute('d', 'M0 0 L10 5 L0 10 z'); p.setAttribute('fill', '#1a1a1a'); m.appendChild(p); defs.appendChild(m);
+    for (const [x, label] of [[cx, 'Client'], [sx, 'Server']]) {
+      el('rect', { x: x - 55, y: 6, width: 110, height: 24, fill: '#e8e8e8', stroke: '#1a1a1a', 'stroke-width': 1 });
+      el('text', { x, y: 22, 'text-anchor': 'middle', 'font-family': 'Segoe UI, Arial, sans-serif', 'font-size': 12, 'font-weight': 600 }, label);
+      el('line', { x1: x, y1: 30, x2: x, y2: H - 6, stroke: '#888', 'stroke-width': 1, 'stroke-dasharray': '4 3' });
+    }
+    steps.forEach((s, i) => {
+      const y = top + i * row + 14;
+      if (s.note) {
+        el('text', { x: (cx + sx) / 2, y: y + 2, 'text-anchor': 'middle', 'font-family': 'Cambria, Georgia, serif', 'font-size': 11, 'font-style': 'italic', fill: '#444' }, s.note);
+        return;
+      }
+      const [x1, x2] = s.dir === 'C' ? [cx, sx] : [sx, cx];
+      el('line', { x1, y1: y, x2: x2 + (x2 > x1 ? -2 : 2), y2: y, stroke: '#1a1a1a', 'stroke-width': 1.2, 'marker-end': `url(#${id}a)`, ...(s.dashed ? { 'stroke-dasharray': '5 3' } : {}) });
+      el('text', { x: (cx + sx) / 2, y: y - 5, 'text-anchor': 'middle', 'font-family': 'Consolas, monospace', 'font-size': 11 }, s.label);
+    });
+  }
+  seq('figStore', [
+    { dir: 'C', label: 'Store_Header  (NumBlocks = 3, TID 7)' },
+    { dir: 'S', label: 'Store_Block_Ack  (next 0)', dashed: true },
+    { dir: 'C', label: 'Store_Data_Block  (Block 0)' },
+    { dir: 'S', label: 'Store_Block_Ack  (next 1)', dashed: true },
+    { dir: 'C', label: 'Store_Data_Block  (Block 1)' },
+    { dir: 'S', label: 'Store_Block_Ack  (next 2)', dashed: true },
+    { dir: 'C', label: 'Store_Data_Block  (Block 2, the last)' },
+    { note: 'Server reassembles, verifies the checksum and writes the Record' },
+    { dir: 'S', label: 'Status  (OK, Record ID 42)', dashed: true },
+  ]);
+  seq('figRetrieve', [
+    { dir: 'C', label: 'Retrieve_Request  (Record 42, Max Block 256)' },
+    { dir: 'S', label: 'Retrieve_Header  (NumBlocks = 3)', dashed: true },
+    { dir: 'C', label: 'Retrieve_Block_Ack  (next 0)' },
+    { dir: 'S', label: 'Retrieve_Data_Block  (Block 0)', dashed: true },
+    { dir: 'C', label: 'Retrieve_Block_Ack  (next 1)' },
+    { dir: 'S', label: 'Retrieve_Data_Block  (Block 1)', dashed: true },
+    { dir: 'C', label: 'Retrieve_Block_Ack  (next 2)' },
+    { dir: 'S', label: 'Retrieve_Data_Block  (Block 2)', dashed: true },
+    { dir: 'C', label: 'Retrieve_Block_Ack  (next 3 = NumBlocks: done)' },
+    { note: 'Client reassembles and verifies the checksum' },
+  ]);
+  seq('figQuery', [
+    { dir: 'C', label: 'Query_Request  (Start Index 0, Max Results 3)' },
+    { dir: 'S', label: 'Query_Result  (Total 40, Index 0)', dashed: true },
+    { dir: 'S', label: 'Query_Result  (Total 40, Index 1)', dashed: true },
+    { dir: 'S', label: 'Query_Result  (Total 40, Index 2)', dashed: true },
+    { note: 'Index 2 = min(0 + 3, 40) - 1: page complete' },
+    { dir: 'C', label: 'Query_Request  (Start Index 3, Max Results 3)' },
+  ]);
+
+  // ---- Table of contents and page-number markers ----
+  const toc = document.getElementById('tocList');
+  let currentChapter = null;
+  document.querySelectorAll('h2[id], h3[id]').forEach(h => {
+    if (h.closest('.toc') || h.closest('.front')) return;
+    const li = document.createElement('li');
+    li.className = h.tagName === 'H2' ? 'lvl1' : 'lvl2';
+    const a = document.createElement('a');
+    a.href = '#' + h.id;
+    const num = h.querySelector('.num');
+    const title = [...h.childNodes].filter(n => !(n.classList && (n.classList.contains('num') || n.classList.contains('mk')))).map(n => n.textContent).join('').trim();
+    const t = document.createElement('span'); t.className = 't';
+    t.textContent = (num ? num.textContent + '  ' : '') + title;
+    const dots = document.createElement('span'); dots.className = 'dots';
+    const pg = document.createElement('span'); pg.className = 'pg'; pg.dataset.for = h.id; pg.textContent = '00';
+    a.append(t, dots, pg);
+    li.append(a);
+    if (h.tagName === 'H2') { toc.append(li); currentChapter = li; }
+    else { let sub = currentChapter.querySelector('ol'); if (!sub) { sub = document.createElement('ol'); currentChapter.append(sub); } sub.append(li); }
+    const mk = document.createElement('span'); mk.className = 'mk'; mk.textContent = '@@' + h.id + '@@';
+    h.append(mk);
+  });
+  window.__ready = true;
+</script>
+</body>
+</html>

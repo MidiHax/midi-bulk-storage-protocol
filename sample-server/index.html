@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBSP WebMIDI Server</title>
+<meta name="description" content="A MIDI Bulk Storage Protocol server that runs in the browser using Web MIDI and IndexedDB.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Doto:wght@400..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="crt.css">
+<style>
+  html, body { margin: 0; min-height: 100%; }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  [hidden] { display: none !important; }
+
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px;
+         max-width: 1400px; margin: 0 auto; padding: 12px 16px; }
+  .top h1 { margin: 0; font-size: 30px; line-height: 1; }
+  .top .sub { color: var(--crt-ink-3); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; margin-top: 4px; }
+  .indicators { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 11px;
+                text-transform: uppercase; letter-spacing: .1em; color: var(--crt-ink-3); }
+  .indicators > span { display: inline-flex; align-items: center; gap: 6px; }
+  .indicators b { color: var(--crt-ink); font-weight: 700; }
+
+  main { flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; padding: 16px; display: grid; gap: 16px;
+         grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); align-items: start; }
+  .col { display: grid; gap: 16px; min-width: 0; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+  .stack { display: grid; gap: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .field { display: grid; gap: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { font-size: 12px; color: var(--crt-ink-3); margin: 0; }
+  .crt-field.bad { border-color: var(--crt-danger); box-shadow: 0 0 0 1px var(--crt-danger); }
+  .titlebar-actions { margin-left: auto; display: flex; gap: 6px; background: var(--crt-bg-head); padding-left: 6px; }
+  .crt-titlebar .crt-btn { height: 18px; padding: 0 8px; font-size: 10px; }
+
+  .ports { display: grid; gap: 6px; max-height: 180px; overflow-y: auto; }
+  .ports .empty { color: var(--crt-ink-3); font-size: 12px; }
+
+  .filters { display: grid; gap: 8px; grid-template-columns: 2fr 1fr 1.4fr 1fr; }
+  @media (max-width: 700px) { .filters { grid-template-columns: 1fr 1fr; } }
+  .table-wrap { overflow: auto; max-height: 420px; }
+  .crt-table td, .crt-table th { white-space: nowrap; }
+  .crt-table tbody tr { cursor: pointer; }
+  .crt-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .crt-table td.clip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .crt-table td.dim { color: var(--crt-ink-3); font-style: italic; }
+  .crt-table th { position: sticky; top: 0; z-index: 1; }
+  .tag { display: inline-block; padding: 0 5px; margin-right: 3px; font-size: 11px; color: var(--crt-acc-lt);
+         border: 1px solid var(--crt-acc-dim); background: var(--crt-bg-well); }
+  .empty-state { padding: 22px 12px; text-align: center; color: var(--crt-ink-3); }
+
+  dl.meta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 13px; }
+  dl.meta dt { color: var(--crt-ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding-top: 2px; }
+  dl.meta dd { margin: 0; color: var(--crt-ink); overflow-wrap: anywhere; }
+  .hexdump { font-size: 12px; line-height: 1.45; max-height: 260px; overflow: auto; white-space: pre; margin: 0; color: var(--crt-ink-2); }
+  .hexdump .off { color: var(--crt-acc-dim); }
+  .hexdump .asc { color: var(--crt-ink-3); }
+
+  .transfers { display: grid; gap: 8px; }
+  .transfer { display: grid; gap: 4px; font-size: 12px; }
+  .transfer .crt-meter > i { height: 8px; }
+
+  .log { height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.45; padding: 6px 8px; }
+  .log div { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .log .t { color: var(--crt-acc-dim); }
+  /* RX in the theme accent; TX 100 degrees round the colour wheel so the two never look alike,
+     clear of the amber (warn) and red (error) used below. */
+  .log .rx { color: var(--crt-acc-br); }
+  .log .tx { color: hsl(calc(var(--crt-h) + 100) 75% 74%); }
+  .log .info { color: var(--crt-ink); }
+  .log .warn { color: var(--crt-led); }
+  .log .error { color: var(--crt-danger); }
+  .log .debug { color: var(--crt-ink-3); }
+  .log .hex { color: var(--crt-ink-3); display: block; padding-left: 9ch; }
+
+  .notice { border-left: 3px solid var(--crt-led); padding: 8px 10px; background: var(--crt-bg-well); font-size: 13px; }
+  .notice.err { border-left-color: var(--crt-danger); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .stat { padding: 6px 8px; }
+  .stat b { display: block; font-size: 18px; color: var(--crt-ink); font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--crt-ink-3); }
+</style>
+</head>
+<body class="crt crt-scanlines">
+
+<header class="crt-header">
+  <div class="top">
+    <div>
+      <h1 class="crt-display">MBSP SERVER</h1>
+      <div class="sub">MIDI Bulk Storage Protocol v1 &middot; WebMIDI server</div>
+    </div>
+    <div class="indicators">
+      <span><i id="ledOnline" class="crt-led off"></i> Server <b id="indName">-</b></span>
+      <span title="This server's MUID, drawn at random each time the page loads">MUID <b id="indMuid">-</b></span>
+      <span><i id="ledMidi" class="crt-led off"></i> MIDI <b id="indMidi">off</b></span>
+      <span><i id="ledRx" class="crt-led off"></i> RX</span>
+      <span><i id="ledTx" class="crt-led off"></i> TX</span>
+      <span>Records <b id="indRecords">0</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="col">
+    <!-- Server settings -->
+    <section class="crt-panel">
+      <div class="crt-titlebar"><span>Server</span></div>
+      <div class="crt-panel-body stack">
+        <label class="crt-switch"><input type="checkbox" id="setOnline"><span class="crt-switch-track"></span> Online (answer requests)</label>
+        <div class="field">
+          <label class="crt-label" for="setName">Server name (4-16 ASCII)</label>
+          <input class="crt-field" id="setName" maxlength="16" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="crt-label" for="setKey">Access key (blank = none)</label>
+          <input class="crt-field" id="setKey" maxlength="16" spellcheck="false" autocomplete="off">
+        </div>
+        <label class="crt-switch"><input type="checkbox" id="setReadOnly"><span class="crt-switch-track"></span> Read-only (refuse Store + Delete)</label>
+        <label class="crt-switch"><input type="checkbox" id="setAllowDelete"><span class="crt-switch-track"></span> Allow Delete requests</label>
+        <label class="crt-switch"><input type="checkbox" id="setOwner"><span class="crt-switch-track"></span> Only owner device may delete</label>
+        <label class="crt-switch"><input type="checkbox" id="setFirmware"><span class="crt-switch-track"></span> Accept firmware / OS stores</label>
+        <div class="row" style="justify-content: space-between">
+          <label class="crt-switch"><input type="checkbox" id="setBeacon"><span class="crt-switch-track"></span> Beacon mode</label>
+          <button class="crt-btn" id="btnAnnounce" type="button">Announce</button>
+        </div>
+        <div class="crt-legend-box">
+          <span class="crt-legend">Timing</span>
+          <div class="grid2">
+            <div class="field"><label class="crt-label" for="setBeaconInt">Beacon (s)</label><input class="crt-field" id="setBeaconInt" type="number" min="1" max="3600"></div>
+            <div class="field"><label class="crt-label" for="setTimeout">Store timeout (s)</label><input class="crt-field" id="setTimeout" type="number" min="1" max="120" step="0.5"></div>
+            <div class="field"><label class="crt-label" for="setBlock">Max block (bytes)</label><input class="crt-field" id="setBlock" type="number" min="1" max="16383"></div>
+            <div class="field"><label class="crt-label" for="setDelay" title="Pause between Query_Result messages. Store and Retrieve blocks are paced by acks instead.">Result delay (ms)</label><input class="crt-field" id="setDelay" type="number" min="0" max="2000"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="crt-label" for="setHue">Display hue</label>
+          <input class="crt-range" id="setHue" type="range" min="0" max="360">
+        </div>
+      </div>
+    </section>
+
+    <!-- MIDI ports -->
+    <section class="crt-panel">
+      <div class="crt-titlebar"><span>MIDI Ports</span></div>
+      <div class="crt-panel-body stack">
+        <div id="midiNotice" class="notice">Web MIDI with SysEx access is needed. Click Connect and allow access.</div>
+        <button class="crt-btn crt-btn-primary" id="btnMidi" type="button">Connect MIDI</button>
+        <div class="crt-label">Inputs (listen)</div>
+        <div class="ports" id="inputs"><div class="empty">-</div></div>
+        <div class="crt-label">Outputs (reply)</div>
+        <div class="ports" id="outputs"><div class="empty">-</div></div>
+      </div>
+    </section>
+
+    <!-- Database -->
+    <section class="crt-panel">
+      <div class="crt-titlebar"><span>Database</span></div>
+      <div class="crt-panel-body stack">
+        <div class="stats">
+          <div class="stat crt-well"><b id="statRecords">0</b><span>Records</span></div>
+          <div class="stat crt-well"><b id="statBytes">0</b><span>Payload</span></div>
+          <div class="stat crt-well"><b id="statNext">1</b><span>Next ID</span></div>
+        </div>
+        <div class="row">
+          <button class="crt-btn crt-btn-primary" id="btnExport" type="button">Export .mbsp</button>
+          <button class="crt-btn" id="btnImportMerge" type="button">Import + merge</button>
+          <button class="crt-btn" id="btnImportReplace" type="button">Import + replace</button>
+        </div>
+        <p class="hint">Merge adds every imported record with a new Record ID. Replace restores the file exactly, IDs included.</p>
+        <input type="file" id="fileImport" accept=".mbsp,application/octet-stream" hidden>
+        <div class="row" style="justify-content: space-between">
+          <button class="crt-btn" id="btnSelfTest" type="button">Run self-test</button>
+          <button class="crt-btn crt-btn-danger" id="btnClear" type="button">Clear database</button>
+        </div>
+        <p class="hint">The self-test runs a virtual client against a separate in-memory server. Your database is not touched.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="col">
+    <!-- Records -->
+    <section class="crt-panel">
+      <div class="crt-titlebar"><span>Records</span><span class="titlebar-actions"><button class="crt-btn" id="btnRefresh" type="button">Refresh</button></span></div>
+      <div class="crt-panel-body stack">
+        <div class="filters">
+          <input class="crt-field" id="fText" placeholder="Search name, number, device, tag" spellcheck="false" aria-label="Search">
+          <select class="crt-field" id="fType" aria-label="Payload type"></select>
+          <select class="crt-field" id="fDevice" aria-label="Device"></select>
+          <select class="crt-field" id="fTag" aria-label="Tag"></select>
+        </div>
+        <div class="table-wrap crt-inset">
+          <table class="crt-table">
+            <thead><tr><th>ID</th><th>Number</th><th>Name</th><th>Type</th><th>Device</th><th>SysEx ID</th><th>Tags</th><th>Size</th><th>Stored</th></tr></thead>
+            <tbody id="recordRows"></tbody>
+          </table>
+          <div id="recordsEmpty" class="empty-state">No records yet. Store something from a client, import a .mbsp file, or run the self-test to check the server.</div>
+        </div>
+        <div class="row" style="justify-content: space-between">
+          <span class="hint" id="recordCount"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Record detail -->
+    <section class="crt-panel" id="detailPanel" hidden>
+      <div class="crt-titlebar"><span id="detailTitle">Record</span>
+        <span class="titlebar-actions">
+          <button class="crt-btn" id="btnDownload" type="button">Download .bin</button>
+          <button class="crt-btn crt-btn-danger" id="btnDelete" type="button">Delete</button>
+          <button class="crt-btn" id="btnCloseDetail" type="button">Close</button>
+        </span>
+      </div>
+      <div class="crt-panel-body stack">
+        <dl class="meta" id="detailMeta"></dl>
+        <div class="crt-label">Payload</div>
+        <pre class="hexdump crt-well" id="hexdump"></pre>
+        <button class="crt-btn" id="btnHexAll" type="button" hidden>Show full payload</button>
+      </div>
+    </section>
+
+    <!-- Transfers -->
+    <section class="crt-panel">
+      <div class="crt-titlebar"><span>Transfers</span></div>
+      <div class="crt-panel-body">
+        <div class="transfers" id="transfers"><span class="hint">Idle</span></div>
+      </div>
+    </section>
+
+    <!-- Activity log -->
+    <section class="crt-panel">
+      <div class="crt-titlebar"><span>Activity</span>
+        <span class="titlebar-actions"><button class="crt-btn" id="btnClearLog" type="button">Clear</button></span>
+      </div>
+      <div class="crt-panel-body stack">
+        <div class="row">
+          <label class="crt-switch"><input type="checkbox" id="logDebug"><span class="crt-switch-track"></span> Show blocks + ignored</label>
+          <label class="crt-switch"><input type="checkbox" id="logHex"><span class="crt-switch-track"></span> Show hex</label>
+        </div>
+        <div class="log crt-well crt-glow" id="log" role="log" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="crt-footer">
+  <div class="crt-footer-inner">
+    <p>Runs entirely in your browser. Records are kept in this browser's IndexedDB.</p>
+    <nav><span class="crt-label">Sub-ID 6A is a placeholder</span></nav>
+  </div>
+</footer>
+
+<script src="js/mbsp-protocol.js"></script>
+<script src="js/mbsp-store.js"></script>
+<script src="js/mbsp-file.js"></script>
+<script src="js/mbsp-server.js"></script>
+<script src="js/mbsp-selftest.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
