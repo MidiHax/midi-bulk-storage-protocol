@@ -61,9 +61,9 @@ The client and server must be connected through a MIDI loopback, so that what on
 
 ```mermaid
 flowchart LR
-  C["Studio Client or TouchOSC panel<br/>sends and listens on <b>Loopback (A)</b>"]
-  L(["Windows MIDI Services<br/>loopback pair"])
-  S["MBSP server page in Chrome or Edge<br/>listens and replies on <b>Loopback (B)</b>"]
+  C["Studio Client or TouchOSC panel: sends and listens on Loopback (A)"]
+  L(["Windows MIDI Services loopback pair"])
+  S["MBSP server page in Chrome or Edge: listens and replies on Loopback (B)"]
   C -- "Requests: out A" --> L
   L -- "arrive on in B" --> S
   S -- "Replies: out B" --> L
