@@ -4,6 +4,10 @@ MBSP Snapshot Panel: root script for a TouchOSC demo panel.
 Save snapshots the panel's generic controls and stores them on an MBSP server.
 Load lists the snapshots on the selected server, and tapping one restores it.
 Discover finds every MBSP server on the MIDI connection (up to four are shown).
+The panel announces itself to servers (MBSP_OnlineClient) when it opens and answers
+MBSP_DiscoverClients, so a server can list it and send Offers to its MUID.
+A server can also offer a snapshot to the panel (MBSP_Offer): the panel asks the user with
+Accept / Decline and, if accepted, fetches it with an ordinary Retrieve.
 
 Everything here is plain Lua 5.1 (TouchOSC's dialect): no bitwise operators and no
 integer division, so CRC-32 and the 7-bit packing are done with arithmetic.
@@ -27,14 +31,17 @@ local DISCOVER_WAIT  = 1000        -- ms to collect OnlineServer replies
 local REPLY_WAIT     = 3000        -- ms to wait for a reply before giving up
 local ROWS           = 6           -- snapshot rows shown per page
 local MAX_SERVERS    = 4
+local OFFER_TIMEOUT  = 30000       -- ms the user has to accept an Offer before it is declined
 local DEBUG          = false       -- true: log received MBSP messages to TouchOSC's script console
 
 local MSG = {
-  DISCOVER = 0, ONLINE = 1, STATUS = 2,
+  DISCOVER = 0, ONLINE = 1, STATUS = 2, DISCOVER_CLIENTS = 3, ONLINE_CLIENT = 4,
   STORE_HEADER = 10, STORE_BLOCK = 11, STORE_ACK = 12,
   RETRIEVE_REQUEST = 20, RETRIEVE_HEADER = 21, RETRIEVE_BLOCK = 22, RETRIEVE_ACK = 23,
   QUERY_REQUEST = 30, QUERY_RESULT = 31,
+  OFFER = 50, OFFER_REPLY = 51,
 }
+local OFFER_RESPONSE = { ACCEPTED = 0, PENDING = 1, DECLINED = 2, BUSY = 3, UNSUPPORTED = 4 }
 local STATUS_NAME = {
   [0] = "OK", [1] = "Not Found", [2] = "Refused", [3] = "Checksum Error", [4] = "Block Sequence Error",
   [5] = "Timeout", [6] = "Storage Full", [7] = "Busy", [8] = "Invalid Request", [9] = "Unknown Transaction",
@@ -59,6 +66,7 @@ local tidCounter = 0
 local servers = {}        -- { { muid, name } } in discovery order
 local selected = nil      -- index into servers
 local op = nil            -- the operation in progress (one at a time)
+local offer = nil         -- an Offer waiting for the user to accept or decline it
 local page = { start = 0, total = 0, results = {} }
 local recentSent = {}     -- recently sent messages, to recognise echoes (MUID collision check)
 
@@ -400,12 +408,14 @@ local function sendStoreBlock(i)
   send(MSG.STORE_BLOCK, server().muid, op.tid, b)
 end
 
-local function retrieve(recordId)
-  local s = server()
+-- srv: the server to fetch from (default: the selected one). expect: the Offer this follows, if any.
+local function retrieve(recordId, srv, expect)
+  local s = srv or server()
   local p = {}
   putN(p, recordId, 3)
   putN(p, BLOCK_SIZE, 2)                      -- Max Block Size
-  op = { kind = "retrieve", tid = nextTid(), deadline = now() + REPLY_WAIT, recordId = recordId, next = 0, data = {} }
+  op = { kind = "retrieve", tid = nextTid(), deadline = now() + REPLY_WAIT, recordId = recordId, next = 0, data = {},
+         srv = s, expect = expect }
   send(MSG.RETRIEVE_REQUEST, s.muid, op.tid, p)
   status("Loading #" .. recordId .. "...")
 end
@@ -413,7 +423,72 @@ end
 local function retrieveAck(n)
   local p = {}
   putN(p, n, 2)
-  send(MSG.RETRIEVE_ACK, server().muid, op.tid, p)
+  send(MSG.RETRIEVE_ACK, op.srv.muid, op.tid, p)
+end
+
+------------------------------------------------------------------------------
+-- Offers: a server offers a Record; the user accepts or declines it here
+------------------------------------------------------------------------------
+local function offerReply(o, response)
+  local p = {}
+  putN(p, o.recordId, 3)
+  put(p, response)
+  put(p, 0x7F)                                -- no SysEx ID
+  putStr(p, DEVICE_NAME)
+  send(MSG.OFFER_REPLY, o.srv.muid, o.tid, p)
+end
+
+-- MBSP_OnlineClient: a reply to DiscoverClients (to that server, with its TID) or a broadcast announcement (TID 0).
+local function announce(dst, tid)
+  local p = {}
+  for i = 1, 7 do put(p, IDENTITY[i]) end
+  put(p, 0x7F)                                -- no SysEx ID
+  putStr(p, DEVICE_NAME)
+  put(p, 1)                                   -- Client Capability Flags: bit 0, accepts Offers
+  send(MSG.ONLINE_CLIENT, dst or BROADCAST, tid or 0, p)
+end
+
+local function showOffer()
+  setText("acceptLabel", offer and "ACCEPT" or "")
+  setText("declineLabel", offer and "DECLINE" or "")
+end
+
+local function serverName(muid)
+  for _, s in ipairs(servers) do if s.muid == muid then return s.name end end
+  return "Server " .. hex(muid, 7)
+end
+
+local function onOffer(d)
+  local o = { tid = d.tid, recordId = d.r:n(3), identity = d.r:bytes(7), sysexId = d.r:n(1), type = d.r:n(1) }
+  o.number = d.r:str()
+  o.name = d.r:str()
+  o.size = d.r:n(3)
+  -- Answer only Offers meant for this panel: its Device Identity, and any unit (it has no SysEx ID).
+  for i = 1, 7 do if o.identity[i] ~= IDENTITY[i] then return end end
+  if o.sysexId ~= 0x7F then return end
+  o.srv = { muid = d.src, name = serverName(d.src) }
+  if offer and offer.srv.muid == o.srv.muid and offer.tid == o.tid then return offerReply(o, OFFER_RESPONSE.PENDING) end -- a repeat
+  if o.type ~= PAYLOAD_TYPE then return offerReply(o, OFFER_RESPONSE.UNSUPPORTED) end
+  if op or offer then return offerReply(o, OFFER_RESPONSE.BUSY) end
+  -- Loading would replace the panel's settings, so the user decides (the Offer stays Pending until then).
+  offerReply(o, OFFER_RESPONSE.PENDING)
+  o.deadline = now() + OFFER_TIMEOUT
+  offer = o
+  showOffer()
+  status(o.srv.name .. " offers " .. (o.name ~= "" and o.name or o.number) .. ". Accept or Decline?")
+end
+
+local function answerOffer(accept)
+  local o = offer
+  if not o then return end
+  offer = nil
+  showOffer()
+  if not accept then
+    offerReply(o, OFFER_RESPONSE.DECLINED)
+    return status("Declined " .. (o.name ~= "" and o.name or o.number) .. " from " .. o.srv.name)
+  end
+  offerReply(o, OFFER_RESPONSE.ACCEPTED)
+  retrieve(o.recordId, o.srv, o)
 end
 
 ------------------------------------------------------------------------------
@@ -449,8 +524,10 @@ local function handle(d)
     showServers() -- show servers as they answer, not only when discovery ends
     return
   end
+  if d.type == MSG.OFFER then return onOffer(d) end  -- not a Reply: it belongs to no transaction of ours
+  if d.type == MSG.DISCOVER_CLIENTS then return announce(d.src, d.tid) end
   if not op or d.tid ~= op.tid or d.dst ~= myMuid then return end
-  local s = server()
+  local s = op.srv or server()
   if not s or d.src ~= s.muid then return end         -- only the server we asked
 
   if d.type == MSG.STATUS then
@@ -492,6 +569,8 @@ local function handle(d)
       local h = { recordId = d.r:n(3) }
       local rec = d.r:record()
       h.name = rec.name
+      h.number = rec.number
+      h.type = rec.type
       h.size = d.r:n(3)
       h.numBlocks = d.r:n(2)
       h.crc = d.r:n(5)
@@ -511,6 +590,11 @@ local function handle(d)
       if op.next == op.header.numBlocks then
         if #op.data ~= op.header.size then return finish("Load failed: size mismatch") end
         if crc32(op.data) ~= op.header.crc then return finish("Load failed: checksum mismatch") end
+        if op.header.recordId ~= op.recordId then return finish("Load failed: wrong record") end
+        local e = op.expect
+        if e and (e.size ~= op.header.size or e.type ~= op.header.type or e.number ~= op.header.number or e.name ~= op.header.name) then
+          return finish("Load failed: the record differs from the Offer")
+        end
         local ok, err = applySnapshot(op.data)
         return finish(ok and ("Loaded " .. op.header.name .. " (#" .. op.recordId .. ")") or ("Load failed: " .. err))
       end
@@ -537,6 +621,7 @@ function onReceiveMIDI(message, connections)
     myMuid = randomMuid()
     setText("muidLabel", "MUID " .. hex(myMuid, 7))
     finish("MUID collision: now using " .. hex(myMuid, 7))
+    announce()                                        -- tell the servers our new MUID
     return
   end
   if d.dst ~= myMuid and d.dst ~= BROADCAST then return end
@@ -549,6 +634,13 @@ end
 -- Timers
 ------------------------------------------------------------------------------
 function update()
+  if offer and now() >= offer.deadline then
+    local o = offer
+    offer = nil
+    showOffer()
+    offerReply(o, OFFER_RESPONSE.DECLINED)
+    if not op then status("Offer from " .. o.srv.name .. " expired") end
+  end
   if not op or now() < op.deadline then return end
   if op.kind == "discover" then
     log("discovery finished: " .. #servers .. " server(s)")
@@ -561,7 +653,7 @@ function update()
   elseif op.kind == "store" and op.retries < MAX_RETRIES then
     op.retries = op.retries + 1                         -- no ack: resend the last message
     op.deadline = now() + ACK_TIMEOUT
-    send(op.last[1], server().muid, op.tid, op.last[2])
+    send(op.last[1], (op.srv or server()).muid, op.tid, op.last[2])
   elseif op.kind == "query" and op.got > 0 then
     showPage()
     finish("Some results were lost. Tap Load to try again.")
@@ -577,6 +669,8 @@ function onReceiveNotify(action, index)
   if action == "discover" then
     if op then return end
     discover()
+  elseif action == "accept" or action == "decline" then
+    if offer then answerOffer(action == "accept") end
   elseif action == "server" then
     if servers[index] then selected = index; showServers(); status("Using " .. servers[index].name) end
   elseif op then
@@ -602,6 +696,8 @@ function init()
   tidCounter = math.random(0, 16383)
   showServers()
   showPage()
+  showOffer()
   setText("muidLabel", "MUID " .. hex(myMuid, 7))
+  announce()
   discover()
 end

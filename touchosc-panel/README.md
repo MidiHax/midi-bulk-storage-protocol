@@ -7,6 +7,7 @@ A TouchOSC panel with a handful of generic controls that saves snapshots of thei
 - **Server buttons:** pick which server Save and Load use. When only one server answers, it's chosen automatically. With two or more, you choose; that's what the spec asks of a Client.
 - **SAVE:** snapshots the controls and stores them as a new record on the chosen server, named "Snapshot *n*" and numbered `001`, `002`, and so on.
 - **LOAD:** lists the panel's snapshots on the chosen server, six at a time, with **Prev** and **Next**. Tap one to restore it.
+- **ACCEPT / DECLINE:** a server can offer a snapshot to the panel (open a record on the server page and tap **Offer**). The panel shows what's offered and waits for you. ACCEPT fetches and restores it; DECLINE, or 30 s without an answer, turns it down.
 
 ## Files
 
@@ -35,6 +36,8 @@ The servers show the panel's records with Device Identity `7D / 0001 / 0001`. Ma
 - **MUID:** drawn at random when the panel opens. If a message arrives with the panel's own MUID as its source and isn't an echo of something the panel sent, the panel draws a new MUID.
 - **Save:** a Query with Max Results 1 reads how many snapshots the panel already has, to number the new one. A Store then sends the snapshot, waiting for each Store_Block_Ack and resending after 1 s of silence, up to 3 times. The snapshot is 32 bytes, so it's always one block.
 - **Load:** a Query filtered on this exact model and type Patch, six results per page. Tapping a row runs a Retrieve, acknowledging the header and every block. The CRC-32 is checked before anything is applied.
+- **Client discovery:** the panel announces itself with OnlineClient (Device Identity, name "TouchOSC Panel", accepts Offers) when it opens and after a MUID collision, and answers DiscoverClients, so a server can list it and send Offers to its MUID.
+- **Offers:** the panel answers an Offer only when it names the panel's Device Identity and any SysEx ID (the panel has none). It replies Pending and asks the user, Busy while another operation is running, and Unsupported for anything but a Patch. After ACCEPT it Retrieves from the server that made the Offer, even one it hasn't discovered, and checks that the record matches the Offer.
 - **Snapshot format:** a format byte (1), a count, then one 14-bit value per control. Fader, knob, XY and toggle values are stored as 0-16383 for 0-1; the mode selector is stored as its index.
 - **Lua 5.1 only:** TouchOSC's Lua has no bitwise operators, so CRC-32 and the 7-bit packing are done with arithmetic. 32-bit constants are written as floats.
 
@@ -45,12 +48,17 @@ npm install
 npm test
 ```
 
-`npm test` rebuilds the `.tosc` and runs seven checks:
+`npm test` rebuilds the `.tosc` and runs twelve checks:
 - discovery of both servers;
 - Save to one server only, with the right metadata;
 - a lost Store ack recovered by resending;
 - Load and restore, comparing every control value;
 - that the two servers are separate, plus paging through 8 snapshots;
+- SysEx delivered without F0 / F7 framing;
+- an Offer declined by the user;
+- an Offer accepted and restored, from a server that requires an Access Key the panel doesn't send;
+- Offers for other devices ignored, other Payload Types answered Unsupported, and an unanswered Offer expiring;
+- that both servers list the panel from its announcement, that it answers DiscoverClients, and that it answers an Offer sent to its MUID;
 - that every control the script refers to exists in the layout;
 - that the `.tosc` file is valid zlib + XML.
 

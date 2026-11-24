@@ -181,6 +181,68 @@ const SNAP1 = { fader1: 0.25, fader2: 0.5, fader3: 0.75, fader4: 1, knob1: 0.1, 
     tap('server', 2);
   });
 
+  const PANEL_ID = [0x7D, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00];
+  const R = MBSP.OFFER_RESPONSE;
+  const replyOf = (offer, muid) => [...offer.replies.values()].find(r => !muid || r.muid === muid);
+
+  await check('Offer: the panel asks the user; Decline is reported to the server', async () => {
+    const offer = await servers[0].offer({ recordId: 3, identity: PANEL_ID });
+    await pump();
+    assert(/Vault-A offers Snapshot 3\. Accept or Decline\?/.test(text('status')), `status "${text('status')}"`);
+    assert(text('acceptLabel') === 'ACCEPT' && text('declineLabel') === 'DECLINE', 'Accept / Decline not shown');
+    assert(replyOf(offer).response === R.PENDING && replyOf(offer).deviceName === 'TouchOSC Panel', 'no Pending reply');
+    tap('decline'); await pump();
+    assert(replyOf(offer).response === R.DECLINED && text('acceptLabel') === '', 'Decline not sent');
+  });
+
+  await check('Offer: Accept fetches and restores the snapshot, even from a server that needs an Access Key', async () => {
+    servers[0].applySettings({ accessKey: 'secret' }); // the panel sends no key, so only the Offer lets it in
+    try {
+      set('fader2', 'x', 0);
+      const offer = await servers[0].offer({ recordId: 4, identity: PANEL_ID });
+      await pump();
+      tap('accept'); await pump();
+      assert(/Loaded Snapshot 4 \(#4\)/.test(text('status')), `status "${text('status')}"`);
+      assert(near(get('fader2'), 0.3), `fader2 ${get('fader2')}`);
+      const rep = replyOf(offer);
+      assert(rep.response === R.ACCEPTED && rep.delivered, 'server did not see the delivery');
+    } finally { servers[0].applySettings({ accessKey: '' }); }
+  });
+
+  await check('Offer: other devices\' Offers are ignored, other Payload Types are Unsupported, and an unanswered Offer expires', async () => {
+    const other = await servers[1].offer({ recordId: 1, identity: [0x41, 0, 0, 6, 1, 0, 0] });
+    await pump();
+    assert(other.replies.size === 0, 'answered an Offer for another device');
+    // A record of another type, stored as if by the panel.
+    const p = Uint8Array.from([1, 2, 3]);
+    const id = await servers[1].store.add({ identity: PANEL_ID, deviceName: 'x', sysexId: 0x7F, type: 0x09, number: 'T1', name: 'Tuning', tags: [], crc32: MBSP.crc32(p) }, p);
+    const tuning = await servers[1].offer({ recordId: id, identity: PANEL_ID });
+    await pump();
+    assert(replyOf(tuning).response === R.UNSUPPORTED, 'Tuning not refused as Unsupported');
+    const late = await servers[1].offer({ recordId: 1, identity: PANEL_ID });
+    await pump();
+    assert(replyOf(late).response === R.PENDING, 'no Pending');
+    await advance(31000);
+    assert(replyOf(late).response === R.DECLINED && /expired/.test(text('status')), `status "${text('status')}"`);
+  });
+
+  await check('Client discovery: the panel announced itself at start-up and answers DiscoverClients', async () => {
+    for (const s of servers) {
+      const c = [...s.clients.values()].find(c => c.deviceName === 'TouchOSC Panel');
+      assert(c && c.identity[0] === 0x7D && c.sysexId === 0x7F && (c.capabilities & MBSP.CLIENT_CAP.OFFERS), `${s.settings.serverName} did not list the panel`);
+    }
+    servers[1].clients.clear();
+    servers[1].discoverClients();
+    await pump();
+    const c = [...servers[1].clients.values()][0];
+    assert(servers[1].clients.size === 1 && c.deviceName === 'TouchOSC Panel', 'panel did not answer DiscoverClients');
+    // An Offer sent to the panel's MUID, taken from the device list.
+    const offer = await servers[1].offer({ recordId: 1, identity: PANEL_ID, dst: c.muid });
+    await pump();
+    assert(replyOf(offer).response === R.PENDING, 'directed Offer not answered');
+    tap('decline'); await pump();
+  });
+
   await check('Every control the script uses exists in the layout', async () => {
     const missing = run('return __missingNames()');
     assert(!missing, `missing: ${missing}`);

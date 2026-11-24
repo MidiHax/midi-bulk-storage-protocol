@@ -2,7 +2,7 @@
 
 A MIDI Bulk Storage Protocol (MBSP) v1 server that runs in a web page. It listens for MBSP SysEx on Web MIDI, keeps records in the browser's IndexedDB, and lets you browse, search, export and import the database.
 
-It follows the protocol in the [MBSP specification](../docs/MBSP-Specification-v1.0-Draft2.pdf).
+It follows the protocol in the [MBSP specification](../docs/MBSP-Specification-v1.0-Draft3.pdf).
 
 ## Running it
 
@@ -42,8 +42,9 @@ All scripts are plain classic scripts that share one `MBSP` global, so there's n
 ## The GUI
 
 - **Server:** go online or offline, set the name and access key, refuse Store/Delete (read-only), refuse Delete, require that only the owning device may delete, set beacon mode, and change timing. Settings are saved in this browser.
-- **Records:** search across name, number, device and tag, and filter by type, device (Device Identity + SysEx ID) or tag. Click a row to see its metadata and a hex dump of the payload. From there you can download the raw payload or delete the record.
-- **Transfers:** shows Stores and Retrieves in progress.
+- **Records:** search across name, number, device and tag, and filter by type, device (Device Identity + SysEx ID) or tag. Click a row to see its metadata and a hex dump of the payload. From there you can download the raw payload, delete the record, or **Offer** it to a device: to one listed device of that model (by its MUID), to the unit that stored it, or to any unit of that model.
+- **Devices:** the devices that announced themselves (MBSP_OnlineClient) or answered **Discover** (MBSP_DiscoverClients), with their identity, SysEx ID, MUID and whether they accept Offers. The page runs a discovery when MIDI connects.
+- **Transfers:** shows Stores and Retrieves in progress, and each Offer from the last minute with every device's answer (accepted, asking its user, declined, busy, cannot use it, or received the record). "No device answered" means no device of that model is listening or none supports Offers.
 - **Activity:** a decoded log of every message. Turn on *Show blocks + ignored* for data blocks and messages addressed to other servers, and *Show hex* for raw bytes.
 - **Database:** export, import (merge or replace), clear, and **Run self-test**. The self-test runs against a separate in-memory server, so it never touches your records.
 
@@ -74,6 +75,8 @@ The spec leaves some details open. This server does the following:
 | A second Store Header with the same MUID + TID | Starts the transaction again and discards the earlier blocks |
 | Status for Store errors | The Request Message Type is always 10 (Store Header), including for errors caused by a data block |
 | Access Key | Applies to Store, Retrieve, Query and Delete, and is checked on the request that opens a transaction. Compared exactly (case and spaces count). With no key configured, any key is accepted. A wrong key gets Status 2 (Refused). DiscoverServers is always answered. Replies carry an empty access key. |
+| Client discovery | Optional in the spec. DiscoverClients is broadcast with a Transaction ID from the same server counter as Offers, and replies are collected for 1 s; devices that don't answer leave the list. OnlineClient announcements (broadcast, TID 0) are accepted at any time. An announcement from a new MUID with the Device Identity and SysEx ID of a listed device replaces that entry, unless the SysEx ID is 7F (identical units can't be told apart). The list is only used for display and Offers; ownership always comes from the request. |
+| Offers | Optional in the spec; this server sends them from the record panel. Offers go to the broadcast MUID with a Transaction ID from the server's own counter (1-16383). Offer_Replies are collected for 2 s; after that, no answer is reported as "no device answered". Nothing is resent. For 60 s, a Client that accepted may Retrieve the offered record without the Access Key. Offer_Replies that match no Offer are ignored, and incoming Offers (another server's) are ignored. |
 | Record IDs | Start at 1 and only ever count up: they are never reused after a Delete, a Clear or an import. They run up to `1FFFFF`; when they run out, Store gets Storage Full. Every Status for a replacing Store carries the Replace Record ID. |
 | Retrieve block size | The smaller of the client's Max Block Size and the server's *Max block* setting. An empty payload is sent as one zero-length block. A Max Block Size so small that the payload would need more than 16383 blocks gets Status 8, Invalid Request. |
 | Query results | In ascending Record ID order. A page with no results gets Status 1 (Not Found). Total Matches is capped at 16383. |

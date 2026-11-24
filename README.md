@@ -8,13 +8,15 @@ MBSP is carried entirely in Universal Non-Real Time System Exclusive messages. I
 - acknowledged block-by-block transfer, with checksums and recovery of lost messages;
 - server-assigned record IDs and atomic replacement of stored records;
 - filtered, paged queries and owner-checked deletion;
+- optional client discovery, so a server can list the devices present;
+- optional Offers, with which a server's user sends a record to a device that accepts it;
 - a classification of bulk data types.
 
-> **Status:** Version 1.0 Draft 2. This is a draft proposal to the MIDI Manufacturers Association (MMA) and the Association of Musical Electronics Industry (AMEI). It has not been adopted and may change substantially. The SysEx Sub-ID it uses (`6Ah`) is a placeholder until the MMA and AMEI assign one, so don't use it in shipping products.
+> **Status:** Version 1.0 Draft 3. This is a draft proposal to the MIDI Manufacturers Association (MMA) and the Association of Musical Electronics Industry (AMEI). It has not been adopted and may change substantially. The SysEx Sub-ID it uses (`6Ah`) is a placeholder until the MMA and AMEI assign one, so don't use it in shipping products.
 
 ## The specification
 
-**[MBSP Specification v1.0 Draft 2 (PDF)](docs/MBSP-Specification-v1.0-Draft2.pdf)**
+**[MBSP Specification v1.0 Draft 3 (PDF)](docs/MBSP-Specification-v1.0-Draft3.pdf)**
 
 The PDF is built from [`docs/src/mbsp-spec.html`](docs/src/mbsp-spec.html). Section 12 of the specification lists open issues on which the proposer asks for reviewers' guidance.
 

@@ -54,7 +54,10 @@ function layout() {
   label('toggleCaption', [20, 562, 340, 24], 'TOGGLES', 14, C.dim);
   add('RADIO', 'mode', [20, 600, 340, 60], { color: C.radio, steps: 4 });
   label('modeCaption', [20, 662, 340, 24], 'MODE', 14, C.dim);
-  label('status', [20, 700, 660, 80], 'Starting...', 18, C.text);
+  label('status', [20, 700, 400, 80], 'Starting...', 18, C.text);
+  // Offers from a server: shown in the button labels only while one waits for an answer.
+  button('accept', [430, 710, 120, 60], '', 'accept', undefined, C.action);
+  button('decline', [560, 710, 120, 60], '', 'decline');
 
   // MBSP: servers, save / load, snapshot list.
   add('BOX', 'mbspPanel', [690, 50, 580, 740], { color: C.panel, interactive: false });

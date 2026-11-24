@@ -1,4 +1,4 @@
-// Builds ../MBSP-Specification-v1.0-Draft2.pdf from mbsp-spec.html with headless Chrome.
+// Builds ../MBSP-Specification-v1.0-Draft3.pdf from mbsp-spec.html with headless Chrome.
 //
 //   node build-pdf.js
 //
@@ -13,7 +13,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const SRC = path.join(__dirname, 'mbsp-spec.html');
-const OUT = path.join(__dirname, '..', 'MBSP-Specification-v1.0-Draft2.pdf');
+const OUT = path.join(__dirname, '..', 'MBSP-Specification-v1.0-Draft3.pdf');
 const PORT = 9411;
 const PY = process.env.PYTHON || 'python';
 const CHROME = process.env.CHROME || [
@@ -24,7 +24,7 @@ const CHROME = process.env.CHROME || [
 ].find(p => fs.existsSync(p));
 
 const FOOTER = `<div style="width:100%;font:8px 'Segoe UI',Arial,sans-serif;color:#666;padding:0 0.9in;display:flex;justify-content:space-between">
-  <span>MIDI Bulk Storage Protocol (MBSP) &middot; Version 1.0 Draft 2</span>
+  <span>MIDI Bulk Storage Protocol (MBSP) &middot; Version 1.0 Draft 3</span>
   <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`;
 const HEADER = `<div style="width:100%;font:8px 'Segoe UI',Arial,sans-serif;color:#8a6a00;padding:0 0.9in;text-align:right;letter-spacing:.08em">
   DRAFT PROPOSAL &middot; NOT AN ADOPTED MMA/AMEI SPECIFICATION</div>`;
@@ -87,7 +87,7 @@ async function main() {
     await evaluate('document.body.classList.remove("markers"), true');
     await print(OUT);
     execFileSync(PY, [path.join(__dirname, 'find_pages.py'), 'meta', OUT, JSON.stringify({
-      Title: 'MIDI Bulk Storage Protocol (MBSP) Specification, Version 1.0 Draft 2',
+      Title: 'MIDI Bulk Storage Protocol (MBSP) Specification, Version 1.0 Draft 3',
       Author: 'Derek Jeter',
       Subject: 'Draft proposal to the MIDI Manufacturers Association: a protocol for MIDI devices to store and recall bulk data on a storage server over System Exclusive',
       Keywords: 'MIDI, MBSP, System Exclusive, bulk dump, librarian, storage, MMA, AMEI',

@@ -20,11 +20,19 @@
  *    A Retrieve already in progress keeps sending the old payload (it holds its own copy).
  *  - A payload that fails validation gets Status 8 (Invalid Request).
  *  - Replies carry an empty Access Key.
+ *  - Client discovery (optional in the spec): discoverClients() broadcasts MBSP_DiscoverClients, and every
+ *    MBSP_OnlineClient (a reply, or a broadcast announcement) updates an advisory device list, keyed by
+ *    Client MUID. A rediscovery drops devices that no longer answer. An announcement from a new MUID with the
+ *    Device Identity and SysEx ID of a listed device (one that has a SysEx ID) replaces the old entry.
+ *    The list is used only for display and for Offers, never for ownership.
+ *  - Offers (optional in the spec) are sent by offer(), from the GUI. Each gets its own Transaction ID
+ *    from a server counter. Replies are collected for offerReplyWaitMs; a Client that accepted may
+ *    Retrieve the offered Record without the Access Key for offerLifetimeMs. Nothing is resent.
  */
 (function (root) {
   'use strict';
   const MBSP = root.MBSP = root.MBSP || {};
-  const { MSG, MSG_NAME, STATUS, STATUS_NAME, LIMITS, Reader, MbspFieldError, build, parse, encodeMessage, decodeMessage } = MBSP;
+  const { MSG, MSG_NAME, STATUS, STATUS_NAME, OFFER_RESPONSE, OFFER_RESPONSE_NAME, LIMITS, Reader, MbspFieldError, build, parse, encodeMessage, decodeMessage } = MBSP;
 
   const DEFAULT_SETTINGS = {
     serverName: 'WebMBSP',
@@ -45,9 +53,12 @@
     maxConcurrentRetrieves: 4,
     beaconEnabled: false,
     beaconIntervalMs: 10000,
+    offerReplyWaitMs: 2000,     // Offer: how long to wait for the first Offer_Reply
+    offerLifetimeMs: 60000,
+    clientDiscoveryWaitMs: 1000, // DiscoverClients: how long to collect OnlineClient replies     // Offer: how long a Pending answer may take, and a keyless Retrieve is allowed
   };
 
-  const SERVER_TO_CLIENT = new Set([MSG.ONLINE_SERVER, MSG.STATUS, MSG.STORE_BLOCK_ACK, MSG.RETRIEVE_HEADER, MSG.RETRIEVE_DATA_BLOCK, MSG.QUERY_RESULT]);
+  const SERVER_TO_CLIENT = new Set([MSG.ONLINE_SERVER, MSG.STATUS, MSG.STORE_BLOCK_ACK, MSG.RETRIEVE_HEADER, MSG.RETRIEVE_DATA_BLOCK, MSG.QUERY_RESULT, MSG.OFFER, MSG.DISCOVER_CLIENTS]);
   const QUIET_TX = new Set([MSG.RETRIEVE_DATA_BLOCK, MSG.STORE_BLOCK_ACK]); // logged at debug level
 
   const { hexMuid } = MBSP;
@@ -80,12 +91,18 @@
       this.stores = new Map();     // key "muid:tid" -> in-progress Store transaction
       this.retrieves = new Map();  // key -> outgoing Retrieve
       this.completed = new Map();  // key -> { status, recordId, expires }: finished Stores, oldest first
+      this.offers = new Map();     // Transaction ID -> Offer we sent (see offer())
+      this.serverTid = 0;          // Transaction IDs of messages we initiate (DiscoverClients, Offer)
+      this.clients = new Map();    // Client MUID -> { muid, identity, sysexId, deviceName, capabilities, lastSeen }
+      this.clientDiscovery = null; // { tid, answered, timer } while a DiscoverClients is collecting replies
       this.beaconTimer = null;
       this.stats = { rx: 0, tx: 0, ignored: 0, stored: 0, retrieved: 0, queried: 0, deleted: 0, errors: 0 };
       // Event hooks, set by the UI
       this.onLog = null;            // ({level, text, bytes})
       this.onRecordsChanged = null; // ()
       this.onTransfersChanged = null; // (transfers[])
+      this.onOffersChanged = null;    // (offers[])
+      this.onClientsChanged = null;   // (clients[])
       this._updateBeacon();
     }
 
@@ -113,6 +130,9 @@
       for (const r of this.retrieves.values()) clearTimeout(r.timer);
       this.retrieves.clear();
       this.completed.clear();
+      this._clearOffers();
+      if (this.clientDiscovery) clearTimeout(this.clientDiscovery.timer);
+      this.clientDiscovery = null;
       clearInterval(this.beaconTimer);
       this.beaconTimer = null;
       this._transfersChanged();
@@ -168,6 +188,7 @@
       for (const tx of this.stores.values()) clearTimeout(tx.timer);
       for (const r of this.retrieves.values()) clearTimeout(r.timer);
       this.stores.clear(); this.retrieves.clear(); this.completed.clear();
+      this._clearOffers();
       this._transfersChanged();
       this._log('warn', `Another device is using this server's MUID ${hexMuid(old)}. Open transfers were abandoned; the new MUID is ${hexMuid(this.muid)}.`, data);
       if (this.onMuidChanged) this.onMuidChanged(this.muid);
@@ -236,7 +257,7 @@
         return;
       }
       // Addressing: our MUID, or broadcast for DiscoverServers only.
-      const forUs = msg.dst === this.muid || (msg.dst === MBSP.MUID_BROADCAST && msg.type === MSG.DISCOVER_SERVERS);
+      const forUs = msg.dst === this.muid || (msg.dst === MBSP.MUID_BROADCAST && (msg.type === MSG.DISCOVER_SERVERS || msg.type === MSG.ONLINE_CLIENT));
       if (!forUs) {
         this.stats.ignored++;
         this._log('debug', `Ignored ${MSG_NAME[msg.type] || 'type ' + msg.type} for MUID ${hexMuid(msg.dst)}`, data);
@@ -252,6 +273,8 @@
           case MSG.RETRIEVE_BLOCK_ACK: return this._onRetrieveAck(msg, data);
           case MSG.QUERY_REQUEST: return await this._onQuery(msg, data);
           case MSG.DELETE_REQUEST: return await this._onDelete(msg, data);
+          case MSG.OFFER_REPLY: return this._onOfferReply(msg, data);
+          case MSG.ONLINE_CLIENT: return this._onOnlineClient(msg, data);
           default:
             // Unknown types are ignored silently: they can't be addressed to one server, so a reply
             // would come from every server on the network.
@@ -493,7 +516,8 @@
         return this._status(msg, MSG.RETRIEVE_REQUEST, STATUS.INVALID_REQUEST);
       }
       this._log('rx', `RX RETRIEVE_REQUEST from MUID ${hexMuid(msg.muid)} TID ${msg.tid}: record ${q.recordId}, max block ${q.maxBlockSize || 'default'}`, data);
-      if (!this._keyOk(msg)) return this._status(msg, MSG.RETRIEVE_REQUEST, STATUS.REFUSED, q.recordId);
+      // A Client that accepted our Offer of this Record may Retrieve it without the Access Key.
+      if (!this._keyOk(msg) && !this._offerAccepted(msg.muid, q.recordId)) return this._status(msg, MSG.RETRIEVE_REQUEST, STATUS.REFUSED, q.recordId);
 
       const meta = q.recordId ? await this.store.get(q.recordId) : null;
       if (!meta) return this._status(msg, MSG.RETRIEVE_REQUEST, STATUS.NOT_FOUND, q.recordId);
@@ -586,6 +610,7 @@
         this.retrieves.delete(job.key);
         this.stats.retrieved++;
         this._log('info', `Sent record ${job.recordId} (${job.payload.length} byte(s)) to MUID ${hexMuid(job.muid)}`);
+        this._offerDelivered(job.muid, job.recordId);
       } else {
         this._sendRetrievePart(job, ack.nextBlock);
       }
@@ -652,6 +677,159 @@
       this._recordsChanged();
     }
   }
+
+  Object.assign(MbspServer.prototype, {
+    // ----- Offer (optional) -----
+
+    /**
+     * Offer a Record to a device: send MBSP_Offer and collect the Offer_Replies.
+     * @param {object} o
+     * @param {number} o.recordId
+     * @param {number[]} o.identity  Target Device Identity (7 bytes)
+     * @param {number} [o.sysexId]   Target Device SysEx ID; 7F = any unit of that model
+     * @param {number} [o.dst]       a Client MUID, or broadcast (the default)
+     * @returns {Promise<object>} the Offer, whose replies fill in as they arrive
+     */
+    async offer({ recordId, identity, sysexId = LIMITS.SYSEX_ID_NONE, dst = MBSP.MUID_BROADCAST }) {
+      const meta = await this.store.get(recordId);
+      if (!meta) throw new Error(`Record ${recordId} does not exist`);
+      const tid = this._nextServerTid();
+      const old = this.offers.get(tid);
+      if (old) this._dropOffer(old);
+      const size = meta.size ?? ((await this.store.getPayload(recordId)) || []).length;
+      const offer = {
+        tid, recordId, identity: Array.from(identity), sysexId, dst, number: meta.number, name: meta.name,
+        sentAt: Date.now(), expires: Date.now() + this.settings.offerLifetimeMs, replies: new Map(), noReply: false, timers: [],
+      };
+      this.offers.set(tid, offer);
+      this._reply({ muid: dst, tid }, MSG.OFFER, build.offer({ recordId, identity, sysexId, type: meta.type, number: meta.number, name: meta.name, size }),
+        `record ${recordId} ${meta.number}${meta.name ? ` "${meta.name}"` : ''} to ${MBSP.formatIdentity(identity)}${sysexId === LIMITS.SYSEX_ID_NONE ? ' (any unit)' : ' ID ' + MBSP.hex2(sysexId)}`);
+      offer.timers.push(setTimeout(() => {
+        if (this.offers.get(tid) !== offer || offer.replies.size) return;
+        offer.noReply = true;
+        this._log('warn', `Offer ${tid} of record ${recordId}: no device answered (switched off, not connected, or no Offer support)`);
+        this._offersChanged();
+      }, this.settings.offerReplyWaitMs));
+      offer.timers.push(setTimeout(() => { if (this.offers.get(tid) === offer) this._dropOffer(offer); }, this.settings.offerLifetimeMs));
+      this._offersChanged();
+      return offer;
+    },
+
+    /** Transaction ID for a message we initiate: 1-16383 from our own counter; 0 is left to announcements. */
+    _nextServerTid() {
+      this.serverTid = this.serverTid % LIMITS.U14_MAX + 1;
+      return this.serverTid;
+    },
+
+    // ----- Client discovery (optional) -----
+
+    /** Broadcast MBSP_DiscoverClients. Devices that do not answer within clientDiscoveryWaitMs leave the list. */
+    discoverClients() {
+      if (this.clientDiscovery) clearTimeout(this.clientDiscovery.timer);
+      const d = { tid: this._nextServerTid(), answered: new Set(), timer: null };
+      this.clientDiscovery = d;
+      this._reply({ muid: MBSP.MUID_BROADCAST, tid: d.tid }, MSG.DISCOVER_CLIENTS, build.discoverClients());
+      d.timer = setTimeout(() => {
+        if (this.clientDiscovery !== d) return;
+        this.clientDiscovery = null;
+        for (const muid of [...this.clients.keys()]) if (!d.answered.has(muid)) this.clients.delete(muid);
+        this._log('info', `Client discovery: ${this.clients.size} device(s) answered`);
+        this._clientsChanged();
+      }, this.settings.clientDiscoveryWaitMs);
+      this._clientsChanged();
+      return d.tid;
+    },
+
+    _onOnlineClient(msg, data) {
+      let c;
+      try { c = parse.onlineClient(new Reader(msg.payload)); } catch (err) {
+        if (!(err instanceof MbspFieldError)) throw err;
+        this.stats.ignored++;
+        this._log('warn', `Ignored malformed ONLINE_CLIENT from MUID ${hexMuid(msg.muid)}: ${err.message}`, data);
+        return;
+      }
+      // A device that announces itself under a new MUID: drop its old entry, when it can be told apart by its SysEx ID.
+      if (c.sysexId !== LIMITS.SYSEX_ID_NONE) {
+        for (const [muid, old] of this.clients) {
+          if (muid !== msg.muid && old.sysexId === c.sysexId && MBSP.identityMatches(3, old.identity, c.identity)) this.clients.delete(muid);
+        }
+      }
+      this.clients.set(msg.muid, { muid: msg.muid, ...c, lastSeen: Date.now() });
+      if (this.clientDiscovery) this.clientDiscovery.answered.add(msg.muid);
+      this._log('rx', `RX ONLINE_CLIENT${msg.dst === MBSP.MUID_BROADCAST ? ' (announcement)' : ''} from MUID ${hexMuid(msg.muid)}: ` +
+        `${c.deviceName || '(no name)'}, ${MBSP.formatIdentity(c.identity)}${c.sysexId === LIMITS.SYSEX_ID_NONE ? '' : ' ID ' + MBSP.hex2(c.sysexId)}` +
+        `${c.capabilities & MBSP.CLIENT_CAP.OFFERS ? ', accepts Offers' : ''}`, data);
+      this._clientsChanged();
+    },
+
+    _clientsChanged() {
+      if (this.onClientsChanged) this.onClientsChanged([...this.clients.values()], !!this.clientDiscovery);
+    },
+
+    _onOfferReply(msg, data) {
+      const offer = this.offers.get(msg.tid);
+      let rep;
+      try { rep = parse.offerReply(new Reader(msg.payload)); } catch (err) {
+        if (!(err instanceof MbspFieldError)) throw err;
+        this.stats.ignored++;
+        this._log('warn', `Ignored malformed OFFER_REPLY from MUID ${hexMuid(msg.muid)}: ${err.message}`, data);
+        return;
+      }
+      // A reply to an Offer we did not send, or one that has expired, is ignored. Offer_Reply is never answered.
+      if (!offer || offer.recordId !== rep.recordId || (offer.dst !== MBSP.MUID_BROADCAST && offer.dst !== msg.muid)) {
+        this.stats.ignored++;
+        this._log('debug', `Ignored OFFER_REPLY TID ${msg.tid} from MUID ${hexMuid(msg.muid)}: no matching Offer`, data);
+        return;
+      }
+      const prev = offer.replies.get(msg.muid);
+      offer.replies.set(msg.muid, { ...rep, muid: msg.muid, at: Date.now(), delivered: prev ? prev.delivered : false });
+      offer.noReply = false;
+      this._log('rx', `RX OFFER_REPLY from MUID ${hexMuid(msg.muid)}${rep.deviceName ? ` (${rep.deviceName})` : ''}: ${OFFER_RESPONSE_NAME[rep.response]} record ${rep.recordId}`, data);
+      this._offersChanged();
+    },
+
+    /** True if this Client accepted a live Offer of this Record. */
+    _offerAccepted(muid, recordId) {
+      const now = Date.now();
+      for (const o of this.offers.values()) {
+        if (o.recordId !== recordId || o.expires <= now) continue;
+        const r = o.replies.get(muid);
+        if (r && r.response === OFFER_RESPONSE.ACCEPTED) return true;
+      }
+      return false;
+    },
+
+    _offerDelivered(muid, recordId) {
+      let changed = false;
+      for (const o of this.offers.values()) {
+        const r = o.recordId === recordId && o.replies.get(muid);
+        if (r && r.response === OFFER_RESPONSE.ACCEPTED && !r.delivered) { r.delivered = true; changed = true; }
+      }
+      if (changed) this._offersChanged();
+    },
+
+    _dropOffer(offer) {
+      for (const t of offer.timers) clearTimeout(t);
+      this.offers.delete(offer.tid);
+      this._offersChanged();
+    },
+
+    _clearOffers() {
+      if (!this.offers) return;
+      for (const o of this.offers.values()) for (const t of o.timers) clearTimeout(t);
+      this.offers.clear();
+      this._offersChanged();
+    },
+
+    _offersChanged() {
+      if (!this.onOffersChanged) return;
+      this.onOffersChanged([...this.offers.values()].map(o => ({
+        tid: o.tid, recordId: o.recordId, number: o.number, name: o.name, identity: o.identity, sysexId: o.sysexId,
+        dst: o.dst, sentAt: o.sentAt, noReply: o.noReply, replies: [...o.replies.values()],
+      })));
+    },
+  });
+
 
   function describeQuery(q) {
     const parts = [];

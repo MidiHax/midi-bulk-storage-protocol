@@ -5,6 +5,13 @@
  * randomly stores, queries, retrieves and deletes patches on an MBSP server. Every reply is
  * checked against the protocol, and a pass/fail summary is printed at the end.
  *
+ * Every device announces itself with MBSP_OnlineClient at start-up and after drawing a new MUID, and
+ * answers MBSP_DiscoverClients, so the server page lists the studio under Devices.
+ *
+ * The devices also answer MBSP_Offer from the target server: tap "Offer" on the server page while
+ * the client runs (--ops 0 keeps it running) and the matching device accepts, asks its "user" first,
+ * declines, or says Busy, then fetches the record with an ordinary Retrieve.
+ *
  *   node mbsp-studio.js --help
  *
  * Reuses the protocol codec from ../sample-server/js/mbsp-protocol.js.
@@ -183,7 +190,7 @@ function findPort(port, wanted) {
   return { idx, names };
 }
 
-const CLIENT_TO_SERVER = new Set([MSG.DISCOVER_SERVERS, MSG.STORE_HEADER, MSG.STORE_DATA_BLOCK, MSG.RETRIEVE_REQUEST, MSG.RETRIEVE_BLOCK_ACK, MSG.QUERY_REQUEST, MSG.DELETE_REQUEST]);
+const CLIENT_TO_SERVER = new Set([MSG.DISCOVER_SERVERS, MSG.STORE_HEADER, MSG.STORE_DATA_BLOCK, MSG.RETRIEVE_REQUEST, MSG.RETRIEVE_BLOCK_ACK, MSG.QUERY_REQUEST, MSG.DELETE_REQUEST, MSG.OFFER_REPLY, MSG.ONLINE_CLIENT]);
 
 // Flow control (Store): wait this long for a Store_Block_Ack before resending, and resend at most this often.
 const ACK_TIMEOUT_MS = 1000;
@@ -203,7 +210,8 @@ class Link {
     this.inName = i.names[i.idx]; this.outName = o.names[o.idx];
     this.devices = new Map();
     this.broadcastListeners = new Set();
-    this.counts = { tx: 0, txBytes: 0, rx: 0, rxBytes: 0, echoes: 0, duplicates: 0, resends: 0, collisions: 0 };
+    this.counts = { tx: 0, txBytes: 0, rx: 0, rxBytes: 0, echoes: 0, duplicates: 0, resends: 0, collisions: 0, offers: 0, discoverClients: 0 };
+    this.onOffer = null; // (decoded Offer message) -> void
     this.recentTx = []; // [{ key, at }] recently sent messages, to recognise echoes
     this.input.on('message', (_dt, bytes) => this._onMessage(bytes));
     this.input.openPort(i.idx);
@@ -231,6 +239,14 @@ class Link {
     if (owner && !this.isEcho(bytes)) { owner.renewMuid(); return; }
     if (CLIENT_TO_SERVER.has(d.type)) { this.counts.echoes++; return; } // our own traffic or another client's
     this.counts.rx++; this.counts.rxBytes += bytes.length;
+    // An Offer is not a Reply: it opens no transaction of ours, so it is handled on its own.
+    if (d.type === MSG.DISCOVER_CLIENTS) {
+      // Client discovery: every device answers (or just the one addressed), from its own MUID.
+      this.counts.discoverClients++;
+      for (const dev of this.devices.values()) if (d.dst === MBSP.MUID_BROADCAST || d.dst === dev.muid) dev.announce(d.src, d.tid);
+      return;
+    }
+    if (d.type === MSG.OFFER) { if ((d.dst === MBSP.MUID_BROADCAST || this.devices.has(d.dst)) && this.onOffer) this.onOffer(d); return; }
     if (d.dst === MBSP.MUID_BROADCAST) { for (const fn of this.broadcastListeners) fn(d); return; }
     const dev = this.devices.get(d.dst);
     if (dev) dev.deliver(d);
@@ -251,6 +267,12 @@ class Device {
   }
   nextTid() { this.tid = (this.tid + 1) & 0x3FFF; return this.tid; }
 
+  /** MBSP_OnlineClient: a reply to DiscoverClients (to that server, with its TID) or a broadcast announcement (TID 0). */
+  announce(dst = MBSP.MUID_BROADCAST, tid = 0) {
+    this.send(MSG.ONLINE_CLIENT, tid, build.onlineClient({ identity: this.identity, sysexId: this.sysexId, deviceName: this.deviceName,
+      capabilities: MBSP.CLIENT_CAP.OFFERS }), dst);
+  }
+
   /** Another device has our MUID: abandon open transactions and draw a new one (spec 5.5). */
   renewMuid() {
     const old = this.muid;
@@ -260,6 +282,7 @@ class Device {
     this.link.counts.collisions++;
     for (const { tx } of [...this.pending.values()]) tx.finish({ error: 'MUID collision: transaction abandoned' });
     log(`WARN  ${this.label}: another device is using MUID ${MBSP.hexMuid(old)}; now using ${MBSP.hexMuid(this.muid)}`);
+    this.announce(); // tell the servers our new MUID
   }
 
   /** Send from this device's MUID to the target server (DiscoverServers: to everyone). */
@@ -453,7 +476,8 @@ function pickRecord(filter) {
   return ids.length ? pick(ids) : null;
 }
 
-async function opRetrieve(dev, recordId = null, expectMissing = false) {
+/** expectOffer: the parsed Offer this Retrieve follows; the Retrieve_Header must describe the same Record. */
+async function opRetrieve(dev, recordId = null, expectMissing = false, expectOffer = null) {
   const t0 = Date.now();
   if (recordId === null) {
     recordId = pickRecord();
@@ -502,7 +526,7 @@ async function opRetrieve(dev, recordId = null, expectMissing = false) {
     const promise = opened.promise;
     dev.send(MSG.RETRIEVE_REQUEST, tid, build.retrieveRequest({ recordId, maxBlockSize }));
     const r = await promise;
-    const op = expectMissing ? 'retrieve:deleted' : 'retrieve';
+    const op = expectMissing ? 'retrieve:deleted' : expectOffer ? 'retrieve:offered' : 'retrieve';
     const what = `#${recordId} (max blk ${maxBlockSize || 'default'})`;
     if (r.timeout) return report(dev, op, 'fail', `${what}: ${hdr ? `got ${blocks.size}/${hdr.numBlocks} blocks` : 'no reply'}`, t0);
     if (r.error) return report(dev, op, 'fail', `${what}: ${r.error}`, t0);
@@ -523,6 +547,9 @@ async function opRetrieve(dev, recordId = null, expectMissing = false) {
     if (total !== r.hdr.size) return report(dev, op, 'fail', `${what}: received ${total} B, header declared Payload Size ${r.hdr.size}`, t0);
     if (MBSP.crc32(data) !== r.hdr.checksum) return report(dev, op, 'fail', `${what}: payload CRC-32 mismatch`, t0);
     if (r.hdr.recordId !== recordId) return report(dev, op, 'fail', `${what}: header has Record ID ${r.hdr.recordId}`, t0);
+    if (expectOffer && (r.hdr.size !== expectOffer.size || r.hdr.type !== expectOffer.type || r.hdr.number !== expectOffer.number || r.hdr.name !== expectOffer.name)) {
+      return report(dev, op, 'fail', `${what}: Retrieve_Header does not match the Offer`, t0);
+    }
     const known = catalog.get(recordId);
     if (known) {
       const m = known.meta;
@@ -684,6 +711,46 @@ const OPS = [
   { weight: 5, run: opDiscover },
 ];
 
+// ---------- Offers ----------
+/**
+ * MBSP_Offer from a server. Every device whose Device Identity and SysEx ID match answers with
+ * MBSP_Offer_Reply and, if it accepts, fetches the record with an ordinary Retrieve.
+ */
+function onOffer(d, devices) {
+  let o;
+  try { o = parse.offer(new Reader(d.payload)); } catch (err) { log(`WARN  Ignored malformed Offer from MUID ${MBSP.hexMuid(d.src)}: ${err.message}`); return; }
+  const what = `#${o.recordId} ${o.number}${o.name ? ` "${o.name}"` : ''} (${MBSP.payloadTypeName(o.type)}, ${o.size} B)`;
+  if (d.src !== serverMuid) { log(`  Offer of ${what} from another server (MUID ${MBSP.hexMuid(d.src)}) ignored`); return; }
+  const targets = devices.filter(dev => (d.dst === MBSP.MUID_BROADCAST || d.dst === dev.muid) && MBSP.offerIsFor(o, dev.identity, dev.sysexId));
+  if (!targets.length) { log(`  Offer of ${what}: no device here matches ${MBSP.formatIdentity(o.identity)} ID ${MBSP.hex2(o.sysexId)}`); return; }
+  targets[0].link.counts.offers++;
+  for (const dev of targets) answerOffer(dev, d, o, what);
+}
+
+async function answerOffer(dev, d, o, what) {
+  const R = MBSP.OFFER_RESPONSE, t0 = Date.now();
+  const reply = response => dev.send(MSG.OFFER_REPLY, d.tid, build.offerReply({ recordId: o.recordId, response, sysexId: dev.sysexId, deviceName: dev.deviceName }), d.src);
+  if (!dev.payloads.some(p => p.type === o.type)) {
+    reply(R.UNSUPPORTED);
+    return report(dev, 'offer', 'pass', `${what}: not a type this device uses -> UNSUPPORTED`, t0);
+  }
+  if (dev.busy) { reply(R.BUSY); return report(dev, 'offer', 'pass', `${what}: busy with another operation -> BUSY`, t0); }
+  dev.busy = true;
+  try {
+    // Most offers are taken at once; some wait for the "user", who may say no.
+    const choice = weighted([{ weight: 5, v: 'accept' }, { weight: 3, v: 'ask' }, { weight: 2, v: 'decline' }]).v;
+    if (choice === 'decline') { reply(R.DECLINED); return report(dev, 'offer', 'pass', `${what} -> DECLINED`, t0); }
+    if (choice === 'ask') {
+      reply(R.PENDING);
+      await sleep(randInt(300, 1500));
+      if (rnd() < 0.3) { reply(R.DECLINED); return report(dev, 'offer', 'pass', `${what} -> PENDING, then the user DECLINED`, t0); }
+    }
+    reply(R.ACCEPTED);
+    report(dev, 'offer', 'pass', `${what} -> ${choice === 'ask' ? 'PENDING, then ' : ''}ACCEPTED`, t0);
+    await opRetrieve(dev, o.recordId, false, o);
+  } finally { dev.busy = false; }
+}
+
 // ---------- Run ----------
 /** DiscoverServers: returns Map name -> [{ muid, info }]. A name with more than one entry is shared by several servers. */
 async function discoverServer(dev, waitMs = 1500) {
@@ -724,6 +791,8 @@ function summary(link, startedAt) {
   log(`${'TOTAL'.padEnd(20)}${String(totals.pass).padStart(6)}${String(totals.warn).padStart(6)}${String(totals.fail).padStart(6)}`);
   const c = link.counts;
   log(`\nMIDI: sent ${c.tx} messages (${(c.txBytes / 1024).toFixed(1)} KB), received ${c.rx} (${(c.rxBytes / 1024).toFixed(1)} KB) in ${secs.toFixed(1)} s`);
+  if (c.discoverClients) log(`DiscoverClients received and answered by every device: ${c.discoverClients}`);
+  if (c.offers) log(`Offers received from the server and answered: ${c.offers}`);
   if (c.resends) log(`Store messages resent after an ack timeout: ${c.resends}`);
   if (c.collisions) log(`MUID collisions detected (a device drew a new MUID): ${c.collisions}`);
   if (c.duplicates) {
@@ -744,6 +813,8 @@ async function main() {
   }
   const link = new Link(opts.in, opts.out);
   const devices = STUDIO.map(s => new Device(s, link));
+  link.onOffer = d => onOffer(d, devices);
+  for (const dev of devices) dev.announce(); // client discovery: announce every device at start-up
   log(`MBSP studio: ${devices.length} devices, sending on "${link.outName}", listening on "${link.inName}", seed ${opts.seed}`);
   link.broadcastListeners.add(d => {
     if (d.type !== MSG.ONLINE_SERVER) return;

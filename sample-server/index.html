@@ -218,14 +218,36 @@
         <div class="crt-label">Payload</div>
         <pre class="hexdump crt-well" id="hexdump"></pre>
         <button class="crt-btn" id="btnHexAll" type="button" hidden>Show full payload</button>
+        <div class="crt-legend-box">
+          <span class="crt-legend">Send to device</span>
+          <div class="row">
+            <select class="crt-field" id="offerTarget" aria-label="Device to offer this record to" style="flex: 1; min-width: 0"></select>
+            <button class="crt-btn crt-btn-primary" id="btnOffer" type="button">Offer</button>
+          </div>
+          <p class="hint" style="margin-top: 6px">The device is asked first (MBSP_Offer). If it accepts, it fetches the record itself with a Retrieve. Devices without Offer support don't answer.</p>
+        </div>
       </div>
     </section>
 
+    <!-- Devices (client discovery) -->
+    <section class="crt-panel">
+      <div class="crt-titlebar"><span>Devices</span><span class="titlebar-actions"><button class="crt-btn" id="btnDiscoverClients" type="button">Discover</button></span></div>
+      <div class="crt-panel-body stack">
+        <div class="table-wrap crt-inset" style="max-height: 220px">
+          <table class="crt-table">
+            <thead><tr><th>Device</th><th>Identity</th><th>SysEx ID</th><th>MUID</th><th>Offers</th><th>Seen</th></tr></thead>
+            <tbody id="clientRows"></tbody>
+          </table>
+          <div id="clientsEmpty" class="empty-state">No devices yet. Devices that support client discovery appear here when they announce themselves or answer Discover.</div>
+        </div>
+      </div>
+    </section>
     <!-- Transfers -->
     <section class="crt-panel">
       <div class="crt-titlebar"><span>Transfers</span></div>
       <div class="crt-panel-body">
         <div class="transfers" id="transfers"><span class="hint">Idle</span></div>
+        <div class="transfers" id="offers" style="margin-top: 10px"></div>
       </div>
     </section>
 

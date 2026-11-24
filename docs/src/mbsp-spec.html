@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>MIDI Bulk Storage Protocol (MBSP) Specification, Version 1.0 Draft 2</title>
+<title>MIDI Bulk Storage Protocol (MBSP) Specification, Version 1.0 Draft 3</title>
 <meta name="description" content="Draft specification of the MIDI Bulk Storage Protocol, proposed to the MIDI Manufacturers Association.">
 <style>
   @page { size: Letter; margin: 0.95in 0.9in 0.9in 0.9in; }
@@ -92,11 +92,11 @@
   <div class="band"><div class="org">Draft proposal for consideration by the MIDI Manufacturers Association</div></div>
   <h1>MIDI Bulk Storage Protocol<br>(MBSP)</h1>
   <div class="subtitle">A protocol for MIDI devices to store, query, retrieve and delete their own bulk data on a storage server over MIDI System Exclusive</div>
-  <div class="version">Specification, Version 1.0 &middot; Draft 2</div>
+  <div class="version">Specification, Version 1.0 &middot; Draft 3</div>
   <div class="status-box">
     <dl>
-      <dt>Document</dt><dd>MBSP-1.0-D2</dd>
-      <dt>Date</dt><dd>November 23, 2026</dd>
+      <dt>Document</dt><dd>MBSP-1.0-D3</dd>
+      <dt>Date</dt><dd>November 24, 2026</dd>
       <dt>Status</dt><dd>Draft proposal. Not an adopted MMA or AMEI specification.</dd>
       <dt>Proposed by</dt><dd>Derek Jeter, <a href="mailto:dcjeter@gmail.com">dcjeter@gmail.com</a></dd>
       <dt>Submitted to</dt><dd>The MIDI Manufacturers Association (MMA) / The MIDI Association, for review and possible joint adoption with the Association of Musical Electronics Industry (AMEI)</dd>
@@ -108,8 +108,8 @@
 <!-- ===================== Front matter ===================== -->
 <section class="front">
   <h2>Abstract</h2>
-  <p>The MIDI Bulk Storage Protocol (MBSP) lets any MIDI device save and recall its own bulk data, such as patches, banks, performances, drum kits, sequences, tunings and calibration data, on a storage Server reachable over an ordinary MIDI connection. The device itself initiates every operation, so no instrument-specific librarian software is needed: one MBSP Server can serve every MBSP-capable device in a studio.</p>
-  <p>MBSP is carried entirely in Universal Non-Real Time System Exclusive messages and works over MIDI 1.0 DIN, USB MIDI and any transport that carries MIDI 1.0 System Exclusive, including MIDI 2.0 UMP Data 64 messages. It defines server discovery, acknowledged block-by-block transfer with checksums and recovery of lost messages, server-assigned record identifiers, atomic replacement of stored records, filtered and paged queries, owner-checked deletion and a classification of bulk data types. The protocol is stateless between transactions and needs only a small amount of memory in the device.</p>
+  <p>The MIDI Bulk Storage Protocol (MBSP) lets any MIDI device save and recall its own bulk data, such as patches, banks, performances, drum kits, sequences, tunings and calibration data, on a storage Server reachable over an ordinary MIDI connection. The device itself initiates every operation, so no instrument-specific librarian software is needed: one MBSP Server can serve every MBSP-capable device in a studio. A Server with a user interface may also offer a Record to a device, which fetches it only if the device accepts.</p>
+  <p>MBSP is carried entirely in Universal Non-Real Time System Exclusive messages and works over MIDI 1.0 DIN, USB MIDI and any transport that carries MIDI 1.0 System Exclusive, including MIDI 2.0 UMP Data 64 messages. It defines discovery of Servers and, optionally, of Clients, acknowledged block-by-block transfer with checksums and recovery of lost messages, server-assigned record identifiers, atomic replacement of stored records, filtered and paged queries, owner-checked deletion, optional offers of Records from a Server to a device, and a classification of bulk data types. The protocol is stateless between transactions and needs only a small amount of memory in the device.</p>
 
   <h2>Status of This Document</h2>
   <p>This is a draft proposal submitted for review. It has not been adopted by the MMA or AMEI and may change substantially. Section 12 lists open issues on which the proposer specifically requests the reviewers' guidance. Working reference implementations of a Server, a test Client and a demonstration Client accompany this proposal (Appendix B).</p>
@@ -120,6 +120,7 @@
     <tbody>
       <tr><td>1.0 Draft 1</td><td>2026-11-22</td><td>First draft for MMA review.</td></tr>
       <tr><td>1.0 Draft 2</td><td>2026-11-23</td><td>Clarifications from pre-submission review: two-way MIDI connection and discovery scope, network figure, announcements exempt from C-2, ascending Record IDs, Payload Size field added to Store_Header and Retrieve_Header, Block-count rules, Access Key comparison, MIDI-CI MUID rule, empty Payloads, concurrent replacements, conformance summary, abbreviations, Open Issues 2-4.</td></tr>
+      <tr><td>1.0 Draft 3</td><td>2026-11-24</td><td>Optional client discovery (MBSP_DiscoverClients, MBSP_OnlineClient), so a Server can list the devices present, and optional Offers, with which a Server proposes a Record to a device that fetches it only if it accepts (MBSP_Offer, MBSP_Offer_Reply). Section 6 renumbered so that messages appear in Message Type order.</td></tr>
     </tbody>
   </table>
 </section>
@@ -160,7 +161,7 @@
 <ul>
   <li>The System Exclusive message envelope and every MBSP message (Section 4 and Section 6).</li>
   <li>The common data structures carried in those messages (Section 5).</li>
-  <li>The procedures for discovery, Store, Retrieve, Query and Delete, including error handling and timeouts (Section 7).</li>
+  <li>The procedures for discovery, Store, Retrieve, Query, Delete and Offer, including error handling and timeouts (Section 7).</li>
   <li>Conformance requirements for Servers and Clients (Sections 8 and 9).</li>
 </ul>
 <p>The following are outside the scope of this version:</p>
@@ -173,7 +174,7 @@
 
 <h3 id="s1-4"><span class="num">1.4</span>Design Goals</h3>
 <ul>
-  <li><b>Device-initiated.</b> The Client decides what to save and when, and restores its own data without a computer.</li>
+  <li><b>Device-initiated.</b> The Client decides what to save and when, and restores its own data without a computer. A Server may offer a Record to a Client, but only the Client decides whether to load it.</li>
   <li><b>Works on MIDI 1.0.</b> Every message is a valid MIDI 1.0 System Exclusive message, usable over 31.25 kbaud DIN connections, mergers and splitters.</li>
   <li><b>Small footprint.</b> A Client needs to hold only one data block and a few counters at a time. No sessions or connection state are kept between transactions.</li>
   <li><b>Data-agnostic Server.</b> The Server stores opaque payloads with a small amount of descriptive metadata, so one Server serves every device.</li>
@@ -212,18 +213,20 @@
   <thead><tr><th style="width:24%">Term</th><th>Definition</th></tr></thead>
   <tbody>
     <tr><td>Client</td><td>A device or application that uses a Server to store and recall its bulk data. Typically an instrument, sequencer, drum machine, effects unit, controller or software instrument.</td></tr>
-    <tr><td>Server</td><td>A device or application that answers MBSP requests and keeps Records. It runs unattended and does not interpret payloads. It is addressed by its MUID and shown to users by its Server Name.</td></tr>
+    <tr><td>Server</td><td>A device or application that answers MBSP requests and keeps Records. It answers Requests without user involvement and does not interpret payloads. It is addressed by its MUID and shown to users by its Server Name.</td></tr>
     <tr><td>Payload</td><td>The bulk data a Client stores, as an opaque sequence of 7-bit bytes.</td></tr>
     <tr><td>Record</td><td>One stored Payload together with its metadata, identified on its Server by a Record ID.</td></tr>
     <tr><td>Request</td><td>A message sent by a Client to a Server.</td></tr>
     <tr><td>Reply</td><td>A message sent by a Server in answer to a Request.</td></tr>
-    <tr><td>Transaction</td><td>A Request and all of its Replies, plus any further Client messages that belong to it (Data Blocks), all carrying the same Client MUID and Transaction ID.</td></tr>
+    <tr><td>Transaction</td><td>A Request and all of its Replies, plus any further Client messages that belong to it (Data Blocks), all carrying the same Client MUID and Transaction ID. A DiscoverClients or an Offer, with the Client messages that answer it, is identified instead by the Server's MUID and a Transaction ID chosen by the Server (Section 4.6).</td></tr>
     <tr><td>Block</td><td>One part of a Payload carried in a single Data Block message.</td></tr>
     <tr><td>MUID</td><td>A random 28-bit number that identifies a Client or a Server on the network until it next powers up (Section 5.5). Every message carries the sender's MUID and the recipient's MUID.</td></tr>
     <tr><td>Device Identity</td><td>The manufacturer, family and model of a device, as reported in its Universal Device Inquiry reply (Section 5.2).</td></tr>
     <tr><td>Owner</td><td>The device that stored a Record, identified by the Device Identity and Client Device SysEx ID sent with the Store.</td></tr>
-    <tr><td>Broadcast MUID</td><td>The MUID <code>0FFFFFFFh</code>, which addresses every device. Only DiscoverServers and OnlineServer are sent to it (Section 4.5).</td></tr>
-    <tr><td>Announcement</td><td>An OnlineServer that a Server sends unprompted to the broadcast MUID with Transaction ID 0: in Beacon Mode, or after drawing a new MUID (Sections 5.5 and 6.2).</td></tr>
+    <tr><td>Broadcast MUID</td><td>The MUID <code>0FFFFFFFh</code>, which addresses every device. Only discovery messages, announcements and Offers are sent to it (Section 4.5).</td></tr>
+    <tr><td>Announcement</td><td>An OnlineServer that a Server sends unprompted to the broadcast MUID with Transaction ID 0, in Beacon Mode or after drawing a new MUID (Sections 5.5 and 6.2), or an OnlineClient that a Client sends the same way (Section 6.5).</td></tr>
+    <tr><td>Device list</td><td>The optional, advisory list of Clients that a Server builds from OnlineClient messages, for its user interface and for Offers (Section 7.1).</td></tr>
+    <tr><td>Offer</td><td>An optional MBSP_Offer message in which a Server proposes that a Client load one of the Server's Records. The Client accepts or declines it, and fetches an accepted Record with an ordinary Retrieve (Section 7.7).</td></tr>
     <tr><td>Payload Type</td><td>The byte that classifies a Payload: a Category, such as Patch or Calibration Data, and whether it is a single item or a collection (Section 5.9).</td></tr>
     <tr><td>Replace Record ID</td><td>The Store_Header field that makes a Store replace an existing Record instead of creating a new one (Section 7.2).</td></tr>
     <tr><td>Completed Store Memory</td><td>The time for which a Server remembers the final Status of a finished Store, so that it can repeat it if that Status was lost (Section 7.2).</td></tr>
@@ -251,7 +254,7 @@
 <h2 id="s3"><span class="num">3</span>Protocol Overview</h2>
 
 <h3 id="s3-1"><span class="num">3.1</span>Roles</h3>
-<p>A Client initiates every Transaction. A Server only ever sends Replies, apart from optional OnlineServer announcements (Section 6.2). A device <span class="rfc">may</span> act as both a Client and a Server, but the two roles are independent.</p>
+<p>A Client initiates every Transaction that transfers or changes data. A Server sends Replies, and only three kinds of message unprompted, all optional: OnlineServer announcements (Section 6.2), DiscoverClients (Section 6.4) and Offers (Section 7.7). An Offer only proposes a Record: the Client decides whether to accept it, and fetches it with a Retrieve of its own. A device <span class="rfc">may</span> act as both a Client and a Server, but the two roles are independent.</p>
 
 <h3 id="s3-2"><span class="num">3.2</span>Network Model</h3>
 <p>MBSP needs a two-way MIDI connection between each Client and the Server it uses, because every operation, including discovery, is a Request followed by Replies. Over MIDI 1.0 DIN this means a cable or route in each direction. A Client that can only send to a Server, or only receive from it, cannot use MBSP.</p>
@@ -259,8 +262,8 @@
 <p>MBSP assumes a MIDI network in which every message may reach every device, as happens with MIDI mergers, splitters, Thru chains, multi-port interfaces and software routing. All MBSP messages are therefore sent to the All Call device ID (<code>7Fh</code>), and addressing is done inside the message:</p>
 <ul>
   <li>Every message carries the sender's <b>Source MUID</b> and the recipient's <b>Destination MUID</b> (Section 4.5). A device ignores any message whose Destination MUID is neither its own nor the broadcast MUID.</li>
-  <li>Clients and Servers each draw a random MUID at power-up. A Client finds Servers, and learns their MUIDs, through discovery (Section 7.1). The <b>Server Name</b> is a display name that Servers announce in OnlineServer.</li>
-  <li>Requests and Replies carry a <b>Transaction ID</b> chosen by the Client, so a Client can have several Transactions open at once.</li>
+  <li>Clients and Servers each draw a random MUID at power-up. A Client finds Servers, and learns their MUIDs, through discovery (Section 7.1). A Server <span class="rfc">may</span> likewise discover Clients, to show its user which devices are present and to address Offers to one of them. The <b>Server Name</b> is a display name that Servers announce in OnlineServer.</li>
+  <li>Requests and Replies carry a <b>Transaction ID</b> chosen by the Client, so a Client can have several Transactions open at once. Only DiscoverClients and Offer carry a Transaction ID chosen by the Server.</li>
 </ul>
 <p>MBSP does not route or forward messages. Discovery reaches exactly the devices that the MIDI routing connects to the Client in both directions. A device with several MIDI ports <span class="rfc">may</span> use MBSP on any of them, and <span class="rfc">should</span> send its Requests to a Server on the port where it discovered that Server. Section 11.3 covers MIDI 2.0 UMP Groups.</p>
 <p>Devices that do not implement MBSP ignore MBSP messages, because MIDI 1.0 requires receivers to ignore Universal System Exclusive messages whose Sub-IDs they do not recognize.</p>
@@ -277,6 +280,8 @@
     <tr><td class="c">0</td><td>MBSP_DiscoverServers</td><td>Client to all</td><td>Find Servers. Each Server replies with OnlineServer.</td></tr>
     <tr><td class="c">1</td><td>MBSP_OnlineServer</td><td>Server</td><td>Reply to DiscoverServers, or an unsolicited announcement (Beacon Mode). Lists the Server's Protocol Versions, policies and limits.</td></tr>
     <tr><td class="c">2</td><td>MBSP_Status</td><td>Server</td><td>Result of a Request: success, or the reason for failure.</td></tr>
+    <tr><td class="c">3</td><td>MBSP_DiscoverClients</td><td>Server to all</td><td>Optional. Find Clients. Each Client that implements client discovery replies with OnlineClient.</td></tr>
+    <tr><td class="c">4</td><td>MBSP_OnlineClient</td><td>Client</td><td>Optional. Reply to DiscoverClients, or an unsolicited announcement. Gives the Client's Device Identity, SysEx ID, Device Name and capabilities.</td></tr>
     <tr><td class="c">10</td><td>MBSP_Store_Header</td><td>Client</td><td>Begins a Store of a new Record, or the replacement of an existing one. Followed by Store_Data_Block messages. Reply: Status.</td></tr>
     <tr><td class="c">11</td><td>MBSP_Store_Data_Block</td><td>Client</td><td>One Block of the Payload being stored.</td></tr>
     <tr><td class="c">12</td><td>MBSP_Store_Block_Ack</td><td>Server</td><td>Flow control: "send Block <i>n</i>".</td></tr>
@@ -287,6 +292,8 @@
     <tr><td class="c">30</td><td>MBSP_Query_Request</td><td>Client</td><td>Searches the Server's Records. Reply: Query_Results, or Status.</td></tr>
     <tr><td class="c">31</td><td>MBSP_Query_Result</td><td>Server</td><td>Describes one matching Record.</td></tr>
     <tr><td class="c">40</td><td>MBSP_Delete_Request</td><td>Client</td><td>Deletes a Record. Reply: Status.</td></tr>
+    <tr><td class="c">50</td><td>MBSP_Offer</td><td>Server</td><td>Optional. Offers a Record to one Client, or to every unit of one model. Reply: Offer_Reply from each Client the Offer is for.</td></tr>
+    <tr><td class="c">51</td><td>MBSP_Offer_Reply</td><td>Client</td><td>Accepts, declines or defers an Offer. Not answered.</td></tr>
   </tbody>
 </table>
 <p>Message Type values not listed are reserved. Values 0-9 are reserved for discovery and general messages, and each further range of ten belongs to one operation, leaving room for extensions.</p>
@@ -347,12 +354,17 @@
     <tr><td>DiscoverServers</td><td>The Client's MUID</td><td>Broadcast, or one Server's MUID</td></tr>
     <tr><td>Reply (Server to Client)</td><td>The Server's MUID</td><td>The MUID of the Client being answered</td></tr>
     <tr><td>OnlineServer announcement</td><td>The Server's MUID</td><td>Broadcast</td></tr>
+    <tr><td>DiscoverClients</td><td>The Server's MUID</td><td>Broadcast, or one Client's MUID</td></tr>
+    <tr><td>OnlineClient</td><td>The Client's MUID</td><td>The MUID of the Server whose DiscoverClients it answers, or broadcast for an announcement</td></tr>
+    <tr><td>Offer</td><td>The Server's MUID</td><td>One Client's MUID, or broadcast</td></tr>
+    <tr><td>Offer_Reply</td><td>The Client's MUID</td><td>The MUID of the Server that sent the Offer</td></tr>
   </tbody>
 </table>
-<p>The value <code>0FFFFFFFh</code> (sent as <code>7F 7F 7F 7F</code>) is the broadcast MUID. Only DiscoverServers and OnlineServer are sent to it, and it is never a Source MUID. The Server Name plays no part in addressing.</p>
+<p>The value <code>0FFFFFFFh</code> (sent as <code>7F 7F 7F 7F</code>) is the broadcast MUID. Only DiscoverServers, OnlineServer, DiscoverClients, OnlineClient and Offer are sent to it, and it is never a Source MUID. The Server Name plays no part in addressing.</p>
 
 <h3 id="s4-6"><span class="num">4.6</span>Transaction ID</h3>
 <p>The Transaction ID is a 14-bit number chosen by the Client. A Client <span class="rfc">shall</span> give each new Transaction a Transaction ID that is not in use by any of its open Transactions, and <span class="rfc">should</span> do this by incrementing a counter that wraps from 3FFFh to 0. Transaction IDs only need to be unique for one Client MUID. Every message belonging to a Transaction, including Data Blocks and all Replies, carries the same Transaction ID.</p>
+<p>The exceptions are the two messages a Server initiates, DiscoverClients and Offer. A Server <span class="rfc">shall</span> choose their Transaction IDs from a counter of its own in the same way, skipping 0, and the Client messages that answer them (OnlineClient and Offer_Reply) carry the same value. These Transaction IDs only need to be unique for one Server MUID. They are separate from the Client's own Transaction IDs: DiscoverClients and Offer are never Replies, even when their Transaction ID equals one the Client is using. Announcements, by Servers and by Clients, use Transaction ID 0.</p>
 
 <h3 id="s4-7"><span class="num">4.7</span>Message Checksum</h3>
 <p>The Message Checksum covers every byte after <code>F0h</code> up to, but not including, the checksum byte itself. It uses the algorithm widely used in Roland System Exclusive messages:</p>
@@ -368,7 +380,7 @@
   <li>The message is too short to hold the envelope, or the Access Key Length is greater than 16.</li>
   <li>The Message Checksum is wrong.</li>
   <li>The Protocol Version is not implemented, except for DiscoverServers (Section 4.2).</li>
-  <li>The Destination MUID is neither the receiver's own MUID nor the broadcast MUID, or the message is sent to the broadcast MUID but is not DiscoverServers or OnlineServer.</li>
+  <li>The Destination MUID is neither the receiver's own MUID nor the broadcast MUID, or the message is sent to the broadcast MUID but is not DiscoverServers, OnlineServer, DiscoverClients, OnlineClient or Offer.</li>
   <li>The Message Type is not defined in the Protocol Version the receiver implements. The receiver cannot know the message's layout or what reply, if any, it expects.</li>
 </ul>
 <p>A message whose Source MUID is the receiver's own MUID is either an echo or a sign of a MUID collision, and is handled as described in Section 5.5.</p>
@@ -552,7 +564,24 @@
   </tbody>
 </table>
 
-<h3 id="s6-4"><span class="num">6.4</span>MBSP_Store_Header (Message Type 10)</h3>
+<h3 id="s6-4"><span class="num">6.4</span>MBSP_DiscoverClients (Message Type 3)</h3>
+<p><b>Sender:</b> Server; optional. <b>Purpose:</b> find the Clients on the network that implement client discovery (Section 7.1). Sent to the broadcast MUID, or to one Client's MUID to check that it is still there, with a Transaction ID chosen by the Server (Section 4.6) and an empty Access Key. <b>Payload:</b> empty.</p>
+<p>Every Client that implements client discovery and receives DiscoverClients <span class="rfc">shall</span> reply with MBSP_OnlineClient, sent from its own MUID to the Server's MUID with the same Transaction ID.</p>
+
+<h3 id="s6-5"><span class="num">6.5</span>MBSP_OnlineClient (Message Type 4)</h3>
+<p><b>Sender:</b> Client; optional. <b>Purpose:</b> answer DiscoverClients, or announce the Client unprompted. It tells Servers which device is behind a Client MUID, so a Server can show it to its user and address Offers to it. A Server learns the Client's MUID from the Source MUID of this message. Announcements use Destination MUID <code>0FFFFFFFh</code> (broadcast) and Transaction ID 0, so that every Server receives them at once.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Client Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>The Client's Device Identity (Section 5.2).</td></tr>
+    <tr><td>Client Device SysEx ID</td><td><code>u7</code></td><td>00h-7Fh</td><td>As in Store_Header (Section 5.4): <code>7Fh</code> if the Client has none.</td></tr>
+    <tr><td>Client Device Name</td><td><code>string(0-32)</code></td><td>-</td><td>As in Store_Header (Section 5.3).</td></tr>
+    <tr><td>Client Capability Flags</td><td><code>u7</code></td><td>-</td><td>Bit 0: the Client accepts Offers (Section 7.7). Bits 1-6 are reserved, sent as 0 and ignored by Servers.</td></tr>
+  </tbody>
+</table>
+<p>As with OnlineServer, later versions may append fields, so a Server ignores any bytes after the fields it knows. OnlineClient is never answered.</p>
+
+<h3 id="s6-6"><span class="num">6.6</span>MBSP_Store_Header (Message Type 10)</h3>
 <p><b>Sender:</b> Client. <b>Purpose:</b> begin storing a Payload. It is followed by NumBlocks MBSP_Store_Data_Block messages with the same Client MUID and Transaction ID. The Server replies with MBSP_Status when the Transaction ends, successfully or not.</p>
 <p>A Store either creates a new Record or replaces an existing one, chosen by the Client with the Replace Record ID field. This corresponds to "Save As" and "Save": a user who keeps tweaking a patch and saving it replaces the same Record each time, while a user who wants to keep the earlier version stores a new Record. A Server never replaces a Record unless asked to, and never decides on its own that two Payloads are the same item (Section 7.2).</p>
 <table class="fields">
@@ -573,7 +602,7 @@
   </tbody>
 </table>
 
-<h3 id="s6-5"><span class="num">6.5</span>MBSP_Store_Data_Block (Message Type 11)</h3>
+<h3 id="s6-7"><span class="num">6.7</span>MBSP_Store_Data_Block (Message Type 11)</h3>
 <p><b>Sender:</b> Client. <b>Purpose:</b> carry one Block of the Payload. Blocks <span class="rfc">shall</span> be sent in order, starting at Block Index 0, and the Client <span class="rfc">shall not</span> send a Block until the Server has asked for it with MBSP_Store_Block_Ack (Section 7.4).</p>
 <table class="fields keep">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -589,7 +618,7 @@
   <li>Otherwise the Server <span class="rfc">shall</span> reply with Status Unknown Transaction (9) and Request Message Type 10, so that the Client learns at once that its Store is no longer open.</li>
 </ul>
 
-<h3 id="s6-6"><span class="num">6.6</span>MBSP_Store_Block_Ack (Message Type 12)</h3>
+<h3 id="s6-8"><span class="num">6.8</span>MBSP_Store_Block_Ack (Message Type 12)</h3>
 <p><b>Sender:</b> Server. <b>Purpose:</b> flow control for a Store. It tells the Client that everything before Block <i>n</i> has been received and that the Server is ready for Block <i>n</i>. It carries the Client MUID and Transaction ID of the Store.</p>
 <table class="fields keep">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -597,7 +626,7 @@
 </table>
 <p>The Server sends Store_Block_Ack with Next Block Index 0 when it accepts a Store_Header, and with Next Block Index <i>i</i>+1 after accepting Block <i>i</i>, except after the last Block, which is answered by the final MBSP_Status. A Server that cannot accept the Store replies with MBSP_Status instead of the first ack. The Server <span class="rfc">may</span> delay an ack until it is ready, for example while it writes the previous Block to storage. The Client matches it to its Store by Transaction ID.</p>
 
-<h3 id="s6-7"><span class="num">6.7</span>MBSP_Retrieve_Request (Message Type 20)</h3>
+<h3 id="s6-9"><span class="num">6.9</span>MBSP_Retrieve_Request (Message Type 20)</h3>
 <p><b>Sender:</b> Client. <b>Purpose:</b> request a stored Record by Record ID. Record IDs come from Query_Result messages or from the Status reply to a Store. The Server replies with MBSP_Retrieve_Header, then sends each of the NumBlocks MBSP_Retrieve_Data_Block messages when the Client asks for it with MBSP_Retrieve_Block_Ack. On failure it replies with MBSP_Status.</p>
 <table class="fields keep">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -607,7 +636,7 @@
   </tbody>
 </table>
 
-<h3 id="s6-8"><span class="num">6.8</span>MBSP_Retrieve_Header (Message Type 21)</h3>
+<h3 id="s6-10"><span class="num">6.10</span>MBSP_Retrieve_Header (Message Type 21)</h3>
 <p><b>Sender:</b> Server. <b>Purpose:</b> describe the Record being returned. Its layout mirrors MBSP_Store_Header so that Clients can share parsing code. It is followed by NumBlocks MBSP_Retrieve_Data_Block messages with the same Client MUID and Transaction ID.</p>
 <table class="fields">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -627,10 +656,10 @@
   </tbody>
 </table>
 
-<h3 id="s6-9"><span class="num">6.9</span>MBSP_Retrieve_Data_Block (Message Type 22)</h3>
-<p><b>Sender:</b> Server. <b>Purpose:</b> carry one Block of the returned Payload. Its layout is identical to MBSP_Store_Data_Block (Section 6.5). The Client checks that it comes from the Server's MUID (C-3). Each Block <span class="rfc">shall</span> be no larger than the Max Block Size of the Request, when one was given. The Server <span class="rfc">shall not</span> send a Block until the Client has asked for it with MBSP_Retrieve_Block_Ack.</p>
+<h3 id="s6-11"><span class="num">6.11</span>MBSP_Retrieve_Data_Block (Message Type 22)</h3>
+<p><b>Sender:</b> Server. <b>Purpose:</b> carry one Block of the returned Payload. Its layout is identical to MBSP_Store_Data_Block (Section 6.7). The Client checks that it comes from the Server's MUID (C-3). Each Block <span class="rfc">shall</span> be no larger than the Max Block Size of the Request, when one was given. The Server <span class="rfc">shall not</span> send a Block until the Client has asked for it with MBSP_Retrieve_Block_Ack.</p>
 
-<h3 id="s6-10"><span class="num">6.10</span>MBSP_Retrieve_Block_Ack (Message Type 23)</h3>
+<h3 id="s6-12"><span class="num">6.12</span>MBSP_Retrieve_Block_Ack (Message Type 23)</h3>
 <p><b>Sender:</b> Client. <b>Purpose:</b> flow control for a Retrieve. It tells the Server that everything before Block <i>n</i> has been received and that the Client is ready for Block <i>n</i>. It carries the Client MUID and Transaction ID of the Retrieve_Request.</p>
 <table class="fields keep">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -638,7 +667,7 @@
 </table>
 <p>The Client sends Retrieve_Block_Ack with Next Block Index 0 after receiving the Retrieve_Header, and with Next Block Index <i>i</i>+1 after receiving Block <i>i</i>, including the last Block. The Client <span class="rfc">may</span> delay an ack until it is ready, for example while it writes the previous Block to memory. The Server matches it to its Retrieve by Client MUID and Transaction ID, and <span class="rfc">shall</span> silently ignore acks that belong to no open Retrieve of its own.</p>
 
-<h3 id="s6-11"><span class="num">6.11</span>MBSP_Query_Request (Message Type 30)</h3>
+<h3 id="s6-13"><span class="num">6.13</span>MBSP_Query_Request (Message Type 30)</h3>
 <p><b>Sender:</b> Client. <b>Purpose:</b> search a Server's Records. A Record matches when it satisfies every supplied filter (logical AND). The Server replies with one MBSP_Query_Result per matching Record in the requested page, or with MBSP_Status (Not Found) when the page is empty.</p>
 <table class="fields">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -656,7 +685,7 @@
   </tbody>
 </table>
 
-<h3 id="s6-12"><span class="num">6.12</span>MBSP_Query_Result (Message Type 31)</h3>
+<h3 id="s6-14"><span class="num">6.14</span>MBSP_Query_Result (Message Type 31)</h3>
 <p><b>Sender:</b> Server. <b>Purpose:</b> describe one matching Record. One message is sent per Record in the page, in ascending Result Index order. Query_Results are not acknowledged, and the Server <span class="rfc">shall not</span> send more of them than the Request's Max Results.</p>
 <table class="fields">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -676,7 +705,7 @@
   </tbody>
 </table>
 
-<h3 id="s6-13"><span class="num">6.13</span>MBSP_Delete_Request (Message Type 40)</h3>
+<h3 id="s6-15"><span class="num">6.15</span>MBSP_Delete_Request (Message Type 40)</h3>
 <p><b>Sender:</b> Client. <b>Purpose:</b> remove a stored Record. The Server replies with MBSP_Status: OK, Not Found or Refused.</p>
 <table class="fields keep">
   <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
@@ -684,6 +713,34 @@
     <tr><td>Record ID</td><td><code>u21</code></td><td>1-2,097,151</td><td>The Record to delete.</td></tr>
     <tr><td>Client Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>The requesting device. Servers <span class="rfc">may</span> refuse when it does not match the Record's Owner.</td></tr>
     <tr><td>Client Device SysEx ID</td><td><code>u7</code></td><td>00h-7Fh</td><td>The requesting unit. Servers <span class="rfc">may</span> refuse when it does not match the Record's Owner.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s6-16"><span class="num">6.16</span>MBSP_Offer (Message Type 50)</h3>
+<p><b>Sender:</b> Server; optional. <b>Purpose:</b> propose that a Client load one of the Server's Records, usually because the Server's user chose to send it to a device. Sent to one Client's MUID, or to the broadcast MUID to reach every unit of the target model, with a Transaction ID chosen by the Server (Section 4.6) and an empty Access Key. The procedure is described in Section 7.7.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Record ID</td><td><code>u21</code></td><td>1-2,097,151</td><td>The Record offered.</td></tr>
+    <tr><td>Target Device Identity</td><td><code>bytes(7)</code></td><td>-</td><td>The model the Offer is for (Section 5.2). Only a Client whose Device Identity matches all 7 bytes answers it.</td></tr>
+    <tr><td>Target Device SysEx ID</td><td><code>u7</code></td><td>00h-7Fh</td><td>The unit the Offer is for. <code>7Fh</code> = any unit of the target model.</td></tr>
+    <tr><td>Client Payload Type</td><td><code>u7</code></td><td>-</td><td>The Record's Payload Type (Section 5.9).</td></tr>
+    <tr><td>Payload Number</td><td><code>string(1-8)</code></td><td>-</td><td>The Record's Payload Number. Informational: the Client decides where to load the Payload.</td></tr>
+    <tr><td>Payload Name</td><td><code>string(0-32)</code></td><td>-</td><td>The Record's Payload Name, so the Client can show its user what is offered.</td></tr>
+    <tr><td>Payload Size</td><td><code>u21</code></td><td>0-2,097,151</td><td>The Record's Payload Size, so the Client can tell before fetching it whether it can hold it.</td></tr>
+  </tbody>
+</table>
+<p>The Target fields usually repeat the Record's Owner, but need not: a Server <span class="rfc">may</span> offer a Record stored by one unit to another unit of the same model.</p>
+
+<h3 id="s6-17"><span class="num">6.17</span>MBSP_Offer_Reply (Message Type 51)</h3>
+<p><b>Sender:</b> Client; only a Client that implements Offers. <b>Purpose:</b> answer an Offer. Sent from the Client's MUID to the Source MUID of the Offer, with the Offer's Transaction ID. The Server sends nothing in reply.</p>
+<table class="fields keep">
+  <thead><tr><th style="width:32%">Field</th><th style="width:15%">Type</th><th style="width:13%">Range</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Record ID</td><td><code>u21</code></td><td>1-2,097,151</td><td>The Record ID of the Offer answered.</td></tr>
+    <tr><td>Response</td><td><code>u7</code></td><td>0-4</td><td>0 = Accepted: the Client will now Retrieve the Record. 1 = Pending: the Client is asking its user and will send a second Offer_Reply. 2 = Declined. 3 = Busy: the Client cannot consider an Offer now. 4 = Unsupported: the Client cannot use this Payload Type or Payload Size. Values 5-127 are reserved; a Server treats them as Declined.</td></tr>
+    <tr><td>Client Device SysEx ID</td><td><code>u7</code></td><td>00h-7Fh</td><td>The answering unit (<code>7Fh</code> if it has none), so that the Server can tell units apart when it broadcast the Offer.</td></tr>
+    <tr><td>Client Device Name</td><td><code>string(0-32)</code></td><td>-</td><td>As in Store_Header (Section 5.3), for the Server to show its user.</td></tr>
   </tbody>
 </table>
 </section>
@@ -697,6 +754,14 @@
 <p>Servers draw a new MUID at power-up (Section 5.5), so a Client <span class="rfc">shall</span> discover the Server it uses before its first Request after the Client powers up, even when it has been configured with a Server Name. It <span class="rfc">should</span> discover again when a Server it was using stops answering, which usually means the Server has restarted with a new MUID. It <span class="rfc">should</span> also follow a Server that announces a new MUID with OnlineServer under the same name.</p>
 <p>If several Servers answer with the same name, a Client <span class="rfc">shall not</span> choose one of them automatically. It <span class="rfc">should</span> tell its user, who can rename one of them, and <span class="rfc">may</span> let the user choose between them by other details, such as their policies.</p>
 <p>OnlineServer tells the Client how to use each Server: which Protocol Version to speak, whether it accepts Stores, Deletes and firmware, whether it needs an Access Key, the largest Store Block it accepts, and roughly how much it can still store. For example, a Client can offer firmware backup only to Servers that accept firmware, and choose a Block size no larger than the Server's Max Store Block Size.</p>
+<p><b>Client discovery (optional).</b> A Server that wants to know which Clients are present, for example to let its user send a Record to one device, sends DiscoverClients to the broadcast MUID and collects OnlineClient replies for the Server client-discovery wait (Table 9). Clients that implement client discovery also announce themselves with OnlineClient to the broadcast MUID at power-up and whenever their MUID, SysEx Device ID or Device Name changes, so a Server learns of them without asking. A Server keeps what it learns in a <b>device list</b>, keyed by Client MUID:</p>
+<ul>
+  <li>The device list is advisory. It is used only to show the user which devices are present and to address Offers. A Server <span class="rfc">shall not</span> use it in place of the Device Identity and SysEx ID carried in Store_Header and Delete_Request: ownership is always taken from the Request itself.</li>
+  <li>An OnlineClient replaces the entry for its Source MUID. When a Client announces a new MUID, the Server cannot know the old one. It <span class="rfc">may</span> drop an entry with the same Device Identity and SysEx ID under another MUID, when the SysEx ID is not <code>7Fh</code>. Identical units without a SysEx ID cannot be told apart this way (Open Issue 2).</li>
+  <li>A rediscovery rebuilds the list: entries whose Clients do not answer a new DiscoverClients <span class="rfc">should</span> be removed. A Server that has just powered up has an empty list and <span class="rfc">should</span> send DiscoverClients before it relies on the list.</li>
+  <li>The Client Capability Flags tell a Server whether a Client accepts Offers, so that it can avoid sending Offers that will go unanswered.</li>
+</ul>
+<p>Client discovery adds no state that any Request depends on. A Server that loses its device list, or never builds one, still answers every Request correctly.</p>
 
 <h3 id="s7-2"><span class="num">7.2</span>Store</h3>
 <figure><svg id="figStore"></svg><figcaption>Figure 2. A successful Store of a Payload in three Blocks, with flow control</figcaption></figure>
@@ -745,7 +810,7 @@
 </ul>
 <p>The <b>receiver</b> of the Blocks:</p>
 <ul>
-  <li><span class="rfc">shall</span> acknowledge the header and every Block it accepts, as described in Sections 6.6 and 6.10;</li>
+  <li><span class="rfc">shall</span> acknowledge the header and every Block it accepts, as described in Sections 6.8 and 6.12;</li>
   <li><span class="rfc">shall</span>, on receiving again the header or the Block it accepted last (because its ack was lost), discard the repeat and send the same ack again;</li>
   <li><span class="rfc">shall</span> treat any other out-of-order Block as an error: a Server replies Block Sequence Error (4), and a Client abandons the Retrieve;</li>
   <li>in a Store, <span class="rfc">shall</span> answer a resent Block that arrives after the Transaction has ended by repeating the final Status (Section 7.2). The last Block is answered by the final Status instead of an ack, so this is how a lost final Status is recovered.</li>
@@ -762,7 +827,21 @@
 <h3 id="s7-6"><span class="num">7.6</span>Delete</h3>
 <p>The Client sends Delete_Request with the Record ID and its own Device Identity and SysEx ID. The Server replies with Status OK, Not Found, or Refused. A Server <span class="rfc">may</span> refuse every Delete (for example an archival or read-only Server), and <span class="rfc">may</span> refuse a Delete that does not come from the Record's Owner (Section 8.4).</p>
 
-<h3 id="s7-7"><span class="num">7.7</span>Timeouts</h3>
+<h3 id="s7-7"><span class="num">7.7</span>Offer</h3>
+<figure><svg id="figOffer"></svg><figcaption>Figure 5. An Offer that the device's user accepts, followed by an ordinary Retrieve</figcaption></figure>
+<p>Offers let the user of a Server send a Record to a device: for example, to load a patch into an instrument from a librarian-style screen on the Server, without operating the instrument's own controls. Offers are optional for Servers and for Clients. A Client that does not implement them ignores MBSP_Offer like any Message Type it does not implement (Section 4.8), so the Server receives no reply.</p>
+<ol>
+  <li>The Server sends Offer to the broadcast MUID, or to the MUID of one Client, for example one from its device list (Section 7.1), naming the Record and the target device.</li>
+  <li>A Client that implements Offers ignores, without replying, an Offer whose Target Device Identity differs from its own Device Identity in any of the 7 bytes, or whose Target Device SysEx ID is neither <code>7Fh</code> nor its own SysEx Device ID. It <span class="rfc">may</span> also ignore Offers from Servers it does not use.</li>
+  <li>Each Client the Offer is for replies with Offer_Reply within the Client Offer reply time (Table 9): Accepted, Declined, Busy or Unsupported, or Pending while it asks its user. After Pending, it sends a second Offer_Reply, Accepted or Declined, when the user decides, or Declined if the user has not decided within the Offer Lifetime.</li>
+  <li>After Accepted, the Client sends an ordinary Retrieve_Request for the offered Record ID to the Server's MUID, with a Transaction ID of its own, and the transfer proceeds as in Section 7.3. The Client checks the Payload as it checks any Retrieve (C-5), and also that the Retrieve_Header's Payload Type, Payload Number, Payload Name and Payload Size match the Offer. If they do not, the Record has changed since it was offered, and the Client discards it.</li>
+</ol>
+<p>The Retrieve is a normal Request, so the Server keeps no Transaction state for the Offer itself. It remembers its Offers only to show their outcome to its user and to apply the Access Key rule below. A Server <span class="rfc">shall not</span> resend an Offer that received no reply. Silence means that no device the Offer is for is listening, or that none implements Offers. The Server <span class="rfc">should</span> tell its user so, and the user can try again.</p>
+<p><b>Access Key.</b> A Server that requires an Access Key <span class="rfc">shall</span> accept, without the key, a Retrieve_Request for an offered Record from a Client that accepted that Offer, until the Offer Lifetime ends. The Server's own user chose to send the Record, and the Client may never have been given the key. Every other Request from that Client still needs the key.</p>
+<p><b>Several units.</b> An Offer to SysEx ID <code>7Fh</code>, or for a model whose units send no SysEx Device ID, reaches every unit of that model, and each may accept it. Each Offer_Reply carries the unit's SysEx Device ID and Device Name, so that the Server can show which units answered. To reach exactly one unit, a Server sends the Offer to that unit's MUID, which client discovery provides (Section 7.1). A Server <span class="rfc">should not</span> send an Offer to a Client whose OnlineClient says that it does not accept Offers. Open Issue 2 also concerns telling identical units apart.</p>
+<p><b>Loading offered data.</b> An Offer can arrive while the device is in use. A Client <span class="rfc">shall not</span> replace data stored in its memory with an offered Payload without its user's confirmation on the device, unless its user has chosen to accept Offers automatically. It <span class="rfc">may</span> load an offered Payload into a temporary edit buffer without confirmation when that destroys nothing the user has saved. Where the data goes is the Client's decision.</p>
+
+<h3 id="s7-8"><span class="num">7.8</span>Timeouts</h3>
 <table class="keep">
   <caption>Table 9. Recommended timeouts</caption>
   <thead><tr><th style="width:38%">Timer</th><th style="width:16%">Value</th><th>Behavior</th></tr></thead>
@@ -773,6 +852,10 @@
     <tr><td>Server: Completed Store Memory</td><td>10 s</td><td>How long a Server remembers the final Status of a finished Store, to repeat it if the Client resends a Block (Section 7.2). It <span class="rfc">shall</span> be longer than Ack Timeout &times; (Max Retries + 1), so that every resend of the last Block is answered.</td></tr>
     <tr><td>Client: reply wait</td><td>5 s</td><td>Time to wait for the first Reply, and between Retrieve messages or Query_Results, before giving up.</td></tr>
     <tr><td>Client: discovery wait</td><td>1 s</td><td>Time to collect OnlineServer replies.</td></tr>
+    <tr><td>Server: client-discovery wait</td><td>1 s</td><td>Time to collect OnlineClient replies to DiscoverClients.</td></tr>
+    <tr><td>Client: Offer reply</td><td>1 s</td><td>Time within which a Client sends its first Offer_Reply (Section 7.7).</td></tr>
+    <tr><td>Server: Offer reply wait</td><td>2 s</td><td>Time a Server waits for the first Offer_Reply before telling its user that no device answered.</td></tr>
+    <tr><td>Offer Lifetime</td><td>60 s</td><td>Time within which a Client that replied Pending sends its final Offer_Reply, and during which a Server accepts a Retrieve of the offered Record without the Access Key from a Client that accepted it.</td></tr>
   </tbody>
 </table>
 <p>Values <span class="rfc">should</span> be configurable. Slow links or large Blocks may need longer values (Section 11.1). A receiver that delays its acks for longer than the sender's Ack Timeout causes harmless resends, which it answers by repeating its ack.</p>
@@ -781,7 +864,7 @@
 <!-- ===================== 8 Server requirements ===================== -->
 <section>
 <h2 id="s8"><span class="num">8</span>Server Requirements</h2>
-<p>A Server implements every message in this specification, although its policies may refuse some Requests. A Client implements discovery and any of the operations it needs: a Client that only backs up its data, for example, needs only Store. Table 10 summarizes what each role implements.</p>
+<p>A Server implements every message in this specification except DiscoverClients, OnlineClient, Offer and Offer_Reply, which are optional, although its policies may refuse some Requests. A Client implements discovery and any of the operations it needs: a Client that only backs up its data, for example, needs only Store. Table 10 summarizes what each role implements.</p>
 <table class="keep">
   <caption>Table 10. Conformance summary</caption>
   <thead><tr><th style="width:30%">Capability</th><th style="width:35%">Server</th><th>Client</th></tr></thead>
@@ -796,6 +879,8 @@
     <tr><td>Announcements (Beacon Mode)</td><td>Optional, off by default</td><td>Accept them (C-2)</td></tr>
     <tr><td>Access Key</td><td>Optional</td><td>Send the key a Server requires</td></tr>
     <tr><td>Firmware storage</td><td>Policy, refused by default</td><td>Optional; user confirmation required</td></tr>
+    <tr><td>Client discovery</td><td>Optional: send DiscoverClients, keep a device list (S-23)</td><td>Optional: answer DiscoverClients and announce (C-16)</td></tr>
+    <tr><td>Offers</td><td>Optional: send Offers and collect Offer_Replies (S-21, S-22)</td><td>Optional: answer Offers (C-14, C-15)</td></tr>
     <tr><td>Reserved and manufacturer-defined Categories</td><td>Required: store as opaque data (S-10)</td><td>Optional</td></tr>
   </tbody>
 </table>
@@ -803,8 +888,8 @@
 <h3 id="s8-1"><span class="num">8.1</span>Reception</h3>
 <ul class="req">
   <li><span class="id">S-1</span><span>A Server <span class="rfc">shall</span> apply the reception rules of Section 4.8.</span></li>
-  <li><span class="id">S-2</span><span>A Server <span class="rfc">shall</span> silently ignore Server-to-Client messages (Message Types 1, 2, 12, 21, 22 and 31), so that other Servers' traffic and MIDI loops do no harm.</span></li>
-  <li><span class="id">S-3</span><span>A Server <span class="rfc">shall</span> silently ignore a message whose Destination MUID is not its own, except DiscoverServers sent to the broadcast MUID (Section 4.8).</span></li>
+  <li><span class="id">S-2</span><span>A Server <span class="rfc">shall</span> silently ignore Server-to-Client messages (Message Types 1, 2, 3, 12, 21, 22, 31 and 50), so that other Servers' traffic and MIDI loops do no harm.</span></li>
+  <li><span class="id">S-3</span><span>A Server <span class="rfc">shall</span> silently ignore a message whose Destination MUID is not its own, except DiscoverServers and OnlineClient sent to the broadcast MUID (Section 4.8).</span></li>
   <li><span class="id">S-4</span><span>A Server <span class="rfc">shall</span> reply with Status Invalid Request (8) to a Request addressed to it whose payload is malformed: a field out of range, non-printable characters, missing bytes or extra bytes after the last field.</span></li>
   <li><span class="id">S-5</span><span>A Server <span class="rfc">shall</span> silently ignore a message whose Message Type it does not implement (Section 4.8).</span></li>
 </ul>
@@ -830,6 +915,9 @@
   <li><span class="id">S-18</span><span>A Server <span class="rfc">shall</span> replace a Record only when a Store_Header names it in Replace Record ID, <span class="rfc">shall</span> apply the Delete policies to the replacement, and <span class="rfc">shall</span> make the replacement atomic, keeping the Record ID (Section 7.2).</span></li>
   <li><span class="id">S-19</span><span>A Server <span class="rfc">shall</span> give each new Record a Record ID higher than any it has assigned before (Section 5.6).</span></li>
   <li><span class="id">S-20</span><span>A Server <span class="rfc">shall</span> reply Invalid Request (8) to a Store whose Blocks do not add up to its Payload Size, and to a Retrieve whose Payload cannot be sent in 16,383 Blocks of the requested Max Block Size (Sections 7.2 and 7.3).</span></li>
+  <li><span class="id">S-21</span><span>A Server that sends Offers <span class="rfc">shall</span> offer only Records it holds, <span class="rfc">shall</span> choose their Transaction IDs as described in Section 4.6, <span class="rfc">shall not</span> resend an Offer that received no reply, and <span class="rfc">shall</span> accept a Retrieve of an offered Record without the Access Key from a Client that accepted the Offer, until the Offer Lifetime ends (Section 7.7).</span></li>
+  <li><span class="id">S-22</span><span>A Server <span class="rfc">shall</span> send nothing in reply to an Offer_Reply, and <span class="rfc">shall</span> ignore one whose Transaction ID and Record ID do not match an Offer it sent within the Offer Lifetime, or that answers an Offer sent to another Client's MUID.</span></li>
+  <li><span class="id">S-23</span><span>A Server that implements client discovery <span class="rfc">shall</span> choose the Transaction IDs of DiscoverClients as described in Section 4.6, <span class="rfc">shall</span> send nothing in reply to OnlineClient, <span class="rfc">shall</span> ignore any bytes after the OnlineClient fields it knows and any reserved Client Capability Flags, and <span class="rfc">shall not</span> use its device list in place of the Device Identity and SysEx ID carried in a Request (Section 7.1).</span></li>
 </ul>
 
 <h3 id="s8-4"><span class="num">8.4</span>Policies</h3>
@@ -848,7 +936,7 @@
 <h2 id="s9"><span class="num">9</span>Client Requirements</h2>
 <ul class="req">
   <li><span class="id">C-1</span><span>A Client <span class="rfc">shall</span> generate its MUID as described in Section 5.5, use it as the Source MUID of every Request, and draw a new MUID when it detects a collision.</span></li>
-  <li><span class="id">C-2</span><span>A Client <span class="rfc">shall</span> ignore messages whose Destination MUID is neither its own nor the broadcast MUID, and Replies whose Transaction ID belongs to no open Transaction. Announcements are the exception: a Client <span class="rfc">may</span> use an OnlineServer sent to the broadcast MUID at any time (Sections 5.5 and 6.2).</span></li>
+  <li><span class="id">C-2</span><span>A Client <span class="rfc">shall</span> ignore messages whose Destination MUID is neither its own nor the broadcast MUID, and Replies whose Transaction ID belongs to no open Transaction. Announcements, DiscoverClients and Offers are the exceptions: a Client <span class="rfc">may</span> use an OnlineServer sent to the broadcast MUID at any time (Sections 5.5 and 6.2), answers DiscoverClients as described in Section 6.4, and handles an Offer as described in Section 7.7.</span></li>
   <li><span class="id">C-3</span><span>A Client <span class="rfc">shall</span> ignore Replies whose Source MUID is not the MUID of the Server it addressed.</span></li>
   <li><span class="id">C-4</span><span>A Client <span class="rfc">should</span> tolerate duplicate Replies, which can occur on networks with mergers or loops, by ignoring a Reply that repeats one already received for the same Transaction (for example a Query_Result with a Result Index already received).</span></li>
   <li><span class="id">C-5</span><span>A Client <span class="rfc">shall</span> check every retrieved Payload before using it: the Retrieve_Header's Record ID is the one requested, the Blocks add up to its Payload Size, and the Full Payload Checksum matches.</span></li>
@@ -859,7 +947,10 @@
   <li><span class="id">C-10</span><span>A Client <span class="rfc">shall</span> set Max Results no higher than the number of Query_Results it can receive back to back, and <span class="rfc">shall not</span> rely on the Server pausing between them (Section 7.4).</span></li>
   <li><span class="id">C-11</span><span>A Client <span class="rfc">shall not</span> send Store Blocks larger than the Server's Max Store Block Size (Section 6.2).</span></li>
   <li><span class="id">C-12</span><span>A Client <span class="rfc">shall</span> ignore any bytes after the OnlineServer fields it knows, and <span class="rfc">shall</span> ignore reserved Policy Flags (Section 4.2).</span></li>
-  <li><span class="id">C-13</span><span>A Client <span class="rfc">shall</span> discover the Server it uses before its first Request after power-up, <span class="rfc">shall not</span> choose automatically between Servers with the same name, and <span class="rfc">should</span> rediscover a Server that stops answering (Section 7.1).</span></li>
+  <li><span class="id">C-13</span><span>A Client <span class="rfc">shall</span> discover the Server it uses before its first Request after power-up (an Offer also gives the Server's MUID, so a Client <span class="rfc">may</span> Retrieve an offered Record without discovering first), <span class="rfc">shall not</span> choose automatically between Servers with the same name, and <span class="rfc">should</span> rediscover a Server that stops answering (Section 7.1).</span></li>
+  <li><span class="id">C-14</span><span>A Client that implements Offers <span class="rfc">shall</span> ignore an Offer that is not for it, <span class="rfc">shall</span> answer one that is for it with Offer_Reply within the Client Offer reply time, and after Pending <span class="rfc">shall</span> send a final Offer_Reply. After Accepted it <span class="rfc">shall</span> Retrieve the Record from the Server that sent the Offer, and <span class="rfc">shall</span> discard it unless the Retrieve_Header matches the Offer (Section 7.7).</span></li>
+  <li><span class="id">C-15</span><span>A Client <span class="rfc">shall not</span> replace data stored in its memory with an offered Payload without its user's confirmation, unless its user has chosen to accept Offers automatically, and <span class="rfc">should</span> answer Busy rather than interrupt an operation in progress.</span></li>
+  <li><span class="id">C-16</span><span>A Client that implements client discovery <span class="rfc">shall</span> answer DiscoverClients sent to the broadcast MUID or to its own MUID with OnlineClient, sent to the Server's MUID with the same Transaction ID. It <span class="rfc">should</span> announce itself with OnlineClient to the broadcast MUID, with Transaction ID 0, after power-up and whenever its MUID, SysEx Device ID or Device Name changes. It <span class="rfc">shall</span> set the Accepts Offers flag only if it implements Offers.</span></li>
 </ul>
 </section>
 
@@ -871,9 +962,10 @@
   <li><b>No authentication.</b> Any device on the network can send any Request. Owner checks (for Delete and Replace) rely on Device Identity and SysEx ID, which any device can claim. They prevent accidents, not deliberate misuse.</li>
   <li><b>Access Key in clear text.</b> The Access Key is visible to every device on the network and should be treated as a convenience, not a password.</li>
   <li><b>Integrity of control messages.</b> Payloads are protected end to end by a CRC-32, but other fields are protected only by the 7-bit Message Checksum. An error that changes two or more bytes of a message can occasionally pass that check, for example turning a Delete_Request into a Delete of a different Record ID. Such errors are rare on MIDI links, and Owner-only Delete limits the damage to the requesting device's own Records.</li>
-  <li><b>Advisory OnlineServer.</b> Policy Flags and limits are not authenticated, and any device can send OnlineServer under any Server Name.</li>
+  <li><b>Advisory OnlineServer and OnlineClient.</b> Policy Flags and limits are not authenticated, and any device can send OnlineServer under any Server Name. Likewise, any device can send OnlineClient claiming any Device Identity and Device Name. A Server's device list is therefore advisory, and is never used for ownership checks (S-23).</li>
   <li><b>MUIDs are not authenticated.</b> A device that sends messages using another device's MUID makes that device draw a new MUID (Section 5.5), which interrupts its open Transactions.</li>
   <li><b>Untrusted Payloads.</b> A retrieved Payload may have been stored by another device or altered on the Server. Clients must validate data before loading it, and should take particular care with anything that changes firmware or calibration. The CRC-32 detects accidental corruption only: anyone who alters a Payload can supply a matching checksum.</li>
+  <li><b>Offers.</b> Any device can send an Offer using any Server's MUID. An Offer cannot change a device's data by itself: the Client decides whether to fetch the Record and asks its user before replacing stored data (C-15). The Retrieve it allows without the Access Key is limited to the offered Record, for the Client that accepted it, for the Offer Lifetime. A Client should treat an offered Payload as untrusted, like any other.</li>
   <li><b>Firmware.</b> Servers should refuse firmware by default (Section 8.4). A Client should never apply firmware retrieved over MBSP without the user's explicit confirmation.</li>
   <li><b>Denial of service.</b> A misbehaving device can flood the network or open many Transactions. Servers should limit concurrent Transactions and apply timeouts.</li>
   <li><b>Privacy.</b> Patch names, tags and set lists may reveal information about a user's work. Server operators should treat exported databases accordingly.</li>
@@ -918,7 +1010,7 @@
 <h2 id="s12"><span class="num">12</span>Open Issues for Review</h2>
 <p>The proposer requests the reviewers' guidance on the following points.</p>
 <div class="note issue"><b>Issue 1</b>Assignment of a Universal Non-Real Time Sub-ID #1 for MBSP. The draft uses 6Ah as a placeholder (Section 13).</div>
-<div class="note issue"><b>Issue 2</b>Ownership of identical units. A Record's Owner is the Device Identity and SysEx Device ID, so identical units that send no SysEx Device ID share one Owner (Section 5.4). Should a future version add an optional persistent identifier for each unit, such as a Client Instance ID, which would also distinguish several independent Clients in one device?</div>
+<div class="note issue"><b>Issue 2</b>Ownership of identical units. A Record's Owner is the Device Identity and SysEx Device ID, so identical units that send no SysEx Device ID share one Owner (Section 5.4). Should a future version add an optional persistent identifier for each unit, such as a Client Instance ID, which would also distinguish several independent Clients in one device? The same question arises for Offers sent to every unit of a model, which each identical unit may accept (Section 7.7), and for a Server's device list, which cannot tell such units apart when one announces a new MUID (Section 7.1).</div>
 <div class="note issue"><b>Issue 3</b>Character set. Names and tags are limited to printable ASCII (Section 2.3), which suits most instrument displays but not every market. Should a future version allow UTF-8, and if so, how should a Client that can display only ASCII show such names?</div>
 <div class="note issue"><b>Issue 4</b>Access Key. The Access Key is sent in clear text and offers convenience rather than security (Section 10). Is it worth keeping in Version 1, or should access control be left to a future authenticated extension?</div>
 
@@ -1026,6 +1118,50 @@
 <pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 04 00 0A 2A 00 00 41 00 00 06 01 00 00 04 4A 75 6E 6F 10 01 03 42 32 32 07 4A 75 6E 6F 50 61 64 01 03 50 61 64 05 00 00 01 00 7C 16 17 22 05 52 F7</pre>
 <p>Replace Record ID <code>2A 00 00</code> (42), and Full Payload Checksum <code>7C 16 17 22 05</code> (CRC-32 <code>5445CB7Ch</code> of the new Payload). After the Block has been transferred, the Server replies with Status OK carrying the same Record ID:</p>
 <pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 56 68 48 00 04 00 02 0A 00 2A 00 00 19 F7</pre>
+<h4>A.11 Offer of Record 42 (Transaction ID 1, chosen by the Server)</h4>
+<p>The Server's user sends Record 42 back to the unit that stored it:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 7F 7F 7F 7F 01 00 32 2A 00 00 41 00 00 06 01 00 00 10 01 03 42 32 32 07 4A 75 6E 6F 50 61 64 05 00 00 41 F7</pre>
+<table class="keep">
+  <thead><tr><th style="width:42%">Bytes</th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">21 06 15 03 7F 7F 7F 7F</td><td>From the Server to the broadcast MUID</td></tr>
+    <tr><td class="mono">01 00 32</td><td>Transaction ID 1 (the Server's own counter), Message Type 50</td></tr>
+    <tr><td class="mono">2A 00 00</td><td>Record ID 42</td></tr>
+    <tr><td class="mono">41 00 00 06 01 00 00</td><td>Target Device Identity: the model of A.4</td></tr>
+    <tr><td class="mono">10</td><td>Target Device SysEx ID 10h: only that unit</td></tr>
+    <tr><td class="mono">01</td><td>Payload Type: Patch</td></tr>
+    <tr><td class="mono">03 42 32 32</td><td>Payload Number "B22"</td></tr>
+    <tr><td class="mono">07 4A 75 6E 6F 50 61 64</td><td>Payload Name "JunoPad"</td></tr>
+    <tr><td class="mono">05 00 00</td><td>Payload Size 5</td></tr>
+    <tr><td class="mono">41</td><td>Message Checksum</td></tr>
+  </tbody>
+</table>
+<h4>A.12 Offer_Reply: Pending, then Accepted</h4>
+<p>The unit asks its user, replying Pending (<code>01</code>) with its SysEx ID and Device Name "Juno":</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 01 00 33 2A 00 00 01 10 04 4A 75 6E 6F 44 F7</pre>
+<p>When the user confirms, it sends Accepted (<code>00</code>), with the Offer's Transaction ID 1:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 01 00 33 2A 00 00 00 10 04 4A 75 6E 6F 45 F7</pre>
+<p>It then fetches the Record with a Retrieve_Request of its own (Transaction ID 5, Max Block Size 256), which proceeds as in Section 7.3:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 05 00 14 2A 00 00 00 02 0E F7</pre>
+<h4>A.13 DiscoverClients (Transaction ID 2, chosen by the Server)</h4>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 21 06 15 03 7F 7F 7F 7F 02 00 03 58 F7</pre>
+<p>From the Server to the broadcast MUID, Message Type <code>03</code>, with an empty payload.</p>
+<h4>A.14 OnlineClient reply</h4>
+<p>The unit of A.4 answers A.13:</p>
+<pre class="bytes">F0 7E 7F 6A 00 01 00 56 68 48 00 21 06 15 03 02 00 04 41 00 00 06 01 00 00 10 04 4A 75 6E 6F 01 54 F7</pre>
+<table class="keep">
+  <thead><tr><th style="width:42%">Bytes</th><th>Field</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">56 68 48 00 21 06 15 03</td><td>From the Client to the Server</td></tr>
+    <tr><td class="mono">02 00 04</td><td>Transaction ID 2 (that of the DiscoverClients), Message Type 4</td></tr>
+    <tr><td class="mono">41 00 00 06 01 00 00</td><td>Client Device Identity</td></tr>
+    <tr><td class="mono">10</td><td>Client Device SysEx ID 10h</td></tr>
+    <tr><td class="mono">04 4A 75 6E 6F</td><td>Client Device Name "Juno"</td></tr>
+    <tr><td class="mono">01</td><td>Client Capability Flags: accepts Offers</td></tr>
+    <tr><td class="mono">54</td><td>Message Checksum</td></tr>
+  </tbody>
+</table>
+<p>As an announcement, the same payload is sent to the broadcast MUID <code>7F 7F 7F 7F</code> with Transaction ID 0.</p>
 </section>
 
 <!-- ===================== Appendix B ===================== -->
@@ -1105,6 +1241,15 @@
     { dir: 'S', label: 'Query_Result  (Total 40, Index 2)', dashed: true },
     { note: 'Index 2 = min(0 + 3, 40) - 1: page complete' },
     { dir: 'C', label: 'Query_Request  (Start Index 3, Max Results 3)' },
+  ]);
+  seq('figOffer', [
+    { note: 'The Server\'s user chooses "send Record 42 to this device"' },
+    { dir: 'S', label: 'Offer  (Record 42, Target Identity + SysEx ID, TID 1)', dashed: true },
+    { dir: 'C', label: 'Offer_Reply  (Pending, TID 1)' },
+    { note: 'The device asks its user, who accepts' },
+    { dir: 'C', label: 'Offer_Reply  (Accepted, TID 1)' },
+    { dir: 'C', label: 'Retrieve_Request  (Record 42, TID 5)' },
+    { dir: 'S', label: 'Retrieve_Header, Data Blocks ...  (Section 7.3)', dashed: true },
   ]);
 
   // ---- Table of contents and page-number markers ----

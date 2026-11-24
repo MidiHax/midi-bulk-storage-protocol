@@ -210,6 +210,7 @@
     renderPorts();
     bindInputs();
     log('info', `MIDI connected: ${midi.inputs.size} input(s), ${midi.outputs.size} output(s)`);
+    if (prefs.online) server.discoverClients(); // find the devices already on the network
     if (!enabledCount(midi.inputs) || !enabledCount(midi.outputs)) {
       log('warn', 'Choose the MIDI input to listen on and the output to reply on under MIDI Ports. New ports start switched off.');
     }
@@ -401,6 +402,7 @@
     add('CRC-32', meta.crc32 !== undefined ? MBSP.hex8(meta.crc32) : '(not stored, older record)');
     add('Stored', meta.storedAt ? new Date(meta.storedAt).toLocaleString() : '-');
     hexdump(selectedPayload, 4096);
+    fillOfferTargets(meta);
     $('detailPanel').hidden = false;
     renderTable();
   }
@@ -437,6 +439,73 @@
     }
   }
 
+  // ---------- Offers ----------
+  /**
+   * Offer targets for a Record: each listed device of that model (by MUID), the unit that stored it,
+   * or any unit of that model. Option values: "muid:<MUID>:<SysEx ID>" or "sysex:<SysEx ID>".
+   */
+  function fillOfferTargets(meta) {
+    const sel = $('offerTarget');
+    sel.replaceChildren();
+    const who = meta.deviceName ? `${meta.deviceName} ` : '';
+    const add = (label, value) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sel.append(o); };
+    for (const c of clientList) {
+      if (!MBSP.identityMatches(3, c.identity, meta.identity)) continue;
+      const offers = c.capabilities & MBSP.CLIENT_CAP.OFFERS;
+      add(`${c.deviceName || 'Device'} at MUID ${MBSP.hexMuid(c.muid)}${c.sysexId === 0x7F ? '' : ', SysEx ID ' + MBSP.hex2(c.sysexId)}${offers ? '' : ' (no Offer support)'}`, `muid:${c.muid}:${c.sysexId}`);
+    }
+    if (meta.sysexId !== 0x7F) add(`${who}unit with SysEx ID ${MBSP.hex2(meta.sysexId)}`, `sysex:${meta.sysexId}`);
+    add(`Any ${who}unit of this model (${MBSP.formatIdentity(meta.identity)})`, 'sysex:127');
+  }
+
+  // ---------- Devices (client discovery) ----------
+  let clientList = [];
+  function renderClients(list, discovering) {
+    clientList = list;
+    const body = $('clientRows');
+    body.replaceChildren();
+    for (const c of list.slice().sort((a, b) => (a.deviceName || '~').localeCompare(b.deviceName || '~'))) {
+      const tr = document.createElement('tr');
+      tr.append(td(c.deviceName || '(no name)', c.deviceName ? '' : 'dim'), td(MBSP.formatIdentity(c.identity)),
+        td(c.sysexId === 0x7F ? '-' : MBSP.hex2(c.sysexId)), td(MBSP.hexMuid(c.muid)),
+        td(c.capabilities & MBSP.CLIENT_CAP.OFFERS ? 'yes' : 'no'), td(new Date(c.lastSeen).toLocaleTimeString()));
+      body.append(tr);
+    }
+    $('clientsEmpty').hidden = list.length > 0;
+    $('btnDiscoverClients').disabled = !!discovering;
+    $('btnDiscoverClients').textContent = discovering ? 'Discovering...' : 'Discover';
+    const meta = selectedId !== null && records.find(r => r.id === selectedId);
+    if (meta) { const keep = $('offerTarget').value; fillOfferTargets(meta); if ([...$('offerTarget').options].some(o => o.value === keep)) $('offerTarget').value = keep; }
+  }
+
+  async function sendOffer() {
+    const meta = records.find(r => r.id === selectedId);
+    if (!meta) return;
+    if (!prefs.online) { log('warn', 'The server is offline: switch Online on to send an Offer'); return; }
+    const [kind, a, b] = $('offerTarget').value.split(':');
+    const target = kind === 'muid' ? { dst: Number(a), sysexId: Number(b) } : { sysexId: Number(a) };
+    try {
+      await server.offer({ recordId: meta.id, identity: meta.identity, ...target });
+    } catch (err) { log('error', `Offer failed: ${err.message}`); }
+  }
+
+  const RESPONSE_TEXT = ['accepted', 'asking its user', 'declined', 'busy', 'cannot use this record'];
+  function renderOffers(list) {
+    const el = $('offers');
+    el.replaceChildren();
+    for (const o of list.slice().reverse()) {
+      const box = document.createElement('div'); box.className = 'transfer';
+      const head = document.createElement('div');
+      const to = o.dst !== MBSP.MUID_BROADCAST ? `MUID ${MBSP.hexMuid(o.dst)}` : o.sysexId === 0x7F ? 'any unit' : 'SysEx ID ' + MBSP.hex2(o.sysexId);
+      head.textContent = `Offer ${o.tid}: record ${o.recordId} ${o.number}${o.name ? ' "' + o.name + '"' : ''} to ${to}`;
+      box.append(head);
+      const lines = o.replies.length ? o.replies.map(r => `  ${r.deviceName || 'Device'} (MUID ${MBSP.hexMuid(r.muid)}): ${r.delivered ? 'received the record' : RESPONSE_TEXT[r.response] || 'response ' + r.response}`)
+        : [o.noReply ? '  No device answered' : '  Waiting for a reply...'];
+      for (const t of lines) { const d = document.createElement('div'); d.className = 'hint'; d.textContent = t; box.append(d); }
+      el.append(box);
+    }
+  }
+
   // ---------- Startup ----------
   let store;
   let server;
@@ -464,6 +533,8 @@
     server.onRecordsChanged = () => refreshRecords();
     server.onMuidChanged = () => updateIndicators();
     server.onTransfersChanged = renderTransfers;
+    server.onOffersChanged = renderOffers;
+    server.onClientsChanged = renderClients;
 
     fillSettings();
     for (const el of [S.online, S.readOnly, S.allowDelete, S.owner, S.firmware, S.beacon, S.beaconInt, S.timeout, S.block, S.delay]) {
@@ -495,6 +566,11 @@
       if (tr) openDetail(Number(tr.dataset.id));
     });
     $('btnCloseDetail').addEventListener('click', closeDetail);
+    $('btnOffer').addEventListener('click', sendOffer);
+    $('btnDiscoverClients').addEventListener('click', () => {
+      if (!prefs.online) return log('warn', 'The server is offline: switch Online on to discover devices');
+      server.discoverClients();
+    });
     $('btnHexAll').addEventListener('click', () => selectedPayload && hexdump(selectedPayload, Infinity));
     $('btnDownload').addEventListener('click', async () => {
       const meta = records.find(r => r.id === selectedId);

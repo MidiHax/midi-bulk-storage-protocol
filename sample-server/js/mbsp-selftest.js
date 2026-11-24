@@ -621,6 +621,133 @@
       server.applySettings({ allowFirmware: false });
     });
 
+    // ----- Offer (optional feature) -----
+    let offerRec = 0;
+    const offerPayload = makePayload(130, 40);
+    const replyTo = (offer, response, opts = {}) => send(MSG.OFFER_REPLY,
+      build.offerReply({ recordId: opts.recordId ?? offer.recordId, response, sysexId: 2, deviceName: 'Juno Test' }), { tid: offer.tid, ...opts });
+
+    await check('Offer: broadcast with Target Identity, Record ID, Payload Type, Number, Name and Size', async () => {
+      offerRec = await store1({ identity: JUNO, sysexId: 2, type: 0x01, number: 'OF1', name: 'Offered', tags: [] }, offerPayload);
+      take();
+      const offer = await server.offer({ recordId: offerRec, identity: JUNO, sysexId: 2 });
+      const out = take();
+      assert(out.length === 1 && out[0].type === MSG.OFFER, 'expected one OFFER');
+      assert(out[0].src === server.muid && out[0].dst === MBSP.MUID_BROADCAST && out[0].tid === offer.tid && out[0].accessKey === '', 'Offer envelope');
+      const o = parse.offer(new Reader(out[0].payload));
+      assert(o.recordId === offerRec && same(o.identity, JUNO) && o.sysexId === 2 && o.type === 0x01 &&
+        o.number === 'OF1' && o.name === 'Offered' && o.size === offerPayload.length, 'Offer fields');
+      assert(MBSP.offerIsFor(o, JUNO, 2) && !MBSP.offerIsFor(o, JUNO, 3) && !MBSP.offerIsFor(o, PROPHET, 2), 'offerIsFor, specific unit');
+      assert(MBSP.offerIsFor({ ...o, sysexId: 0x7F }, JUNO, 9), 'offerIsFor, any unit');
+      const next = await server.offer({ recordId: offerRec, identity: JUNO });
+      assert(next.tid === offer.tid + 1, 'Offer Transaction IDs do not count up');
+      take();
+    });
+
+    await check('Offer: an accepted Offer allows a Retrieve without the Access Key, and is marked delivered', async () => {
+      server.applySettings({ accessKey: 'secret' });
+      try {
+        await send(MSG.RETRIEVE_REQUEST, build.retrieveRequest({ recordId: offerRec }));
+        expectStatus(take(), MSG.RETRIEVE_REQUEST, STATUS.REFUSED);
+        tid = (tid + 1) & 0x3FFF;
+        const offer = await server.offer({ recordId: offerRec, identity: JUNO, sysexId: 2 });
+        take();
+        await replyTo(offer, MBSP.OFFER_RESPONSE.ACCEPTED);
+        assert(take().length === 0, 'the server answered an Offer_Reply');
+        const rep = offer.replies.get(muid);
+        assert(rep && rep.response === MBSP.OFFER_RESPONSE.ACCEPTED && rep.deviceName === 'Juno Test', 'reply not recorded');
+        const { data } = await retrieve1(offerRec);
+        assert(same(Array.from(data), Array.from(offerPayload)), 'payload differs');
+        assert(rep.delivered, 'Offer not marked delivered');
+        // The keyless Retrieve is only for the offered Record.
+        tid = (tid + 1) & 0x3FFF;
+        await send(MSG.RETRIEVE_REQUEST, build.retrieveRequest({ recordId: ids.padB || 1 }));
+        expectStatus(take(), MSG.RETRIEVE_REQUEST, STATUS.REFUSED);
+      } finally { server.applySettings({ accessKey: '' }); }
+    });
+
+    await check('Offer: Pending then Declined; replies to unknown Offers and Offers sent to a server are ignored', async () => {
+      const offer = await server.offer({ recordId: offerRec, identity: JUNO, sysexId: 2 });
+      take();
+      await replyTo(offer, MBSP.OFFER_RESPONSE.PENDING);
+      assert(offer.replies.get(muid).response === MBSP.OFFER_RESPONSE.PENDING, 'Pending not recorded');
+      await replyTo(offer, MBSP.OFFER_RESPONSE.DECLINED);
+      assert(offer.replies.get(muid).response === MBSP.OFFER_RESPONSE.DECLINED, 'Declined did not replace Pending');
+      const ignoredBefore = server.stats.ignored;
+      await replyTo({ tid: 0x3FFE, recordId: offerRec }, MBSP.OFFER_RESPONSE.ACCEPTED);             // no such Offer
+      await replyTo(offer, MBSP.OFFER_RESPONSE.ACCEPTED, { recordId: offerRec + 1000 });           // wrong Record ID
+      await send(MSG.OFFER, build.offer({ recordId: 1, identity: JUNO, sysexId: 2, type: 1, number: 'X', size: 0 }), { dst: MBSP.MUID_BROADCAST });
+      assert(take().length === 0, 'the server replied');
+      assert(server.stats.ignored === ignoredBefore + 3, 'not counted as ignored');
+      assert(offer.replies.get(muid).response === MBSP.OFFER_RESPONSE.DECLINED, 'a mismatched reply changed the Offer');
+    });
+
+    await check('Offer: no reply is reported after the reply wait; a directed Offer ignores other MUIDs', async () => {
+      server.applySettings({ offerReplyWaitMs: 30 });
+      try {
+        const offer = await server.offer({ recordId: offerRec, identity: JUNO, dst: OTHER_MUID });
+        const out = take();
+        assert(out.length === 1 && out[0].dst === OTHER_MUID, 'directed Offer not sent to the MUID');
+        await replyTo(offer, MBSP.OFFER_RESPONSE.ACCEPTED); // from our MUID, not the one offered to
+        assert(offer.replies.size === 0, 'reply from another MUID accepted');
+        await new Promise(r => setTimeout(r, 60));
+        assert(offer.noReply, 'no-reply not reported');
+      } finally { server.applySettings({ offerReplyWaitMs: 2000 }); }
+      let threw = false;
+      try { await server.offer({ recordId: 999999, identity: JUNO }); } catch (_) { threw = true; }
+      assert(threw, 'offered a Record that does not exist');
+    });
+
+    // ----- Client discovery (optional feature) -----
+    const online = (c, opts = {}) => send(MSG.ONLINE_CLIENT, build.onlineClient(c), opts);
+
+    await check('Client discovery: DiscoverClients is broadcast with a server Transaction ID; replies fill the device list', async () => {
+      server.applySettings({ clientDiscoveryWaitMs: 30 });
+      try {
+        const dtid = server.discoverClients();
+        const out = take();
+        assert(out.length === 1 && out[0].type === MSG.DISCOVER_CLIENTS && out[0].dst === MBSP.MUID_BROADCAST && out[0].tid === dtid &&
+          out[0].src === server.muid && out[0].payload.length === 0, 'DiscoverClients envelope');
+        await online({ identity: JUNO, sysexId: 2, deviceName: 'Juno Test', capabilities: MBSP.CLIENT_CAP.OFFERS }, { tid: dtid });
+        assert(take().length === 0, 'the server answered an OnlineClient');
+        const c = server.clients.get(muid);
+        assert(c && same(c.identity, JUNO) && c.sysexId === 2 && c.deviceName === 'Juno Test' && (c.capabilities & MBSP.CLIENT_CAP.OFFERS), 'device not listed');
+        // Round trip of the codec, and extra bytes from a later version are ignored.
+        const p = build.onlineClient({ identity: PROPHET, sysexId: 0x7F, deviceName: '', capabilities: 0 });
+        const back = parse.onlineClient(new Reader(Uint8Array.from([...p, 0x11, 0x22])));
+        assert(same(back.identity, PROPHET) && back.sysexId === 0x7F && back.deviceName === '' && back.capabilities === 0, 'codec round trip');
+      } finally { server.applySettings({ clientDiscoveryWaitMs: 1000 }); }
+    });
+
+    await check('Client discovery: announcements are accepted; a new MUID replaces a device with the same Identity and SysEx ID', async () => {
+      await online({ identity: PROPHET, sysexId: 5, deviceName: 'Prophet', capabilities: 0 }, { dst: MBSP.MUID_BROADCAST, tid: 0, src: OTHER_MUID });
+      assert(server.clients.get(OTHER_MUID)?.deviceName === 'Prophet', 'broadcast announcement not listed');
+      await online({ identity: PROPHET, sysexId: 5, deviceName: 'Prophet', capabilities: 0 }, { dst: MBSP.MUID_BROADCAST, tid: 0, src: OTHER_MUID + 1 });
+      assert(!server.clients.has(OTHER_MUID) && server.clients.has(OTHER_MUID + 1), 'old MUID not replaced');
+      // Devices without a SysEx ID cannot be told apart, so both stay.
+      await online({ identity: PROPHET, sysexId: 0x7F, capabilities: 0 }, { dst: MBSP.MUID_BROADCAST, tid: 0, src: OTHER_MUID + 2 });
+      await online({ identity: PROPHET, sysexId: 0x7F, capabilities: 0 }, { dst: MBSP.MUID_BROADCAST, tid: 0, src: OTHER_MUID + 3 });
+      assert(server.clients.has(OTHER_MUID + 2) && server.clients.has(OTHER_MUID + 3), 'identical units merged');
+      assert(take().length === 0, 'the server replied');
+    });
+
+    await check('Client discovery: a rediscovery drops devices that do not answer; another server\'s DiscoverClients is ignored', async () => {
+      server.applySettings({ clientDiscoveryWaitMs: 30 });
+      try {
+        const dtid = server.discoverClients();
+        take();
+        await online({ identity: JUNO, sysexId: 2, deviceName: 'Juno Test', capabilities: 1 }, { tid: dtid });
+        await new Promise(r => setTimeout(r, 60));
+        assert(server.clients.size === 1 && server.clients.has(muid), `expected only the device that answered, got ${server.clients.size}`);
+      } finally { server.applySettings({ clientDiscoveryWaitMs: 1000 }); }
+      const ignored = server.stats.ignored;
+      await send(MSG.DISCOVER_CLIENTS, [], { dst: MBSP.MUID_BROADCAST, src: OTHER_MUID });
+      assert(take().length === 0 && server.stats.ignored === ignored + 1, 'DiscoverClients from another server not ignored');
+      let threw = false;
+      try { await online({ identity: JUNO, sysexId: 2 }, {}); } catch (_) { threw = true; }
+      assert(!threw && server.clients.get(muid).capabilities === 0, 'capabilities not updated');
+    });
+
     await check('Payload Type names', async () => {
       const n = MBSP.payloadTypeName;
       assert(n(0x01) === 'Patch' && n(0x41) === 'Bank of Patches' && n(0x45) === 'Bank of Drum Kits', 'standard names');

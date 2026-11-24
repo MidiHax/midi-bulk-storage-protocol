@@ -3,7 +3,7 @@
  * Pure functions, no browser APIs, so it runs in the page and under Node.
  * Everything is exposed on globalThis.MBSP.
  *
- * Interpretations of the spec (docs/MBSP-Specification-v1.0-Draft2.pdf) made here:
+ * Interpretations of the spec (docs/MBSP-Specification-v1.0-Draft3.pdf) made here:
  *  - Envelope: ... Access Key, Source MUID (u28), Destination MUID (u28), Transaction ID, Message Type.
  *    Requests go from the Client's MUID to the Server's MUID (DiscoverServers to broadcast 0FFFFFFF).
  *  - Message Checksum: Roland algorithm, (128 - (sum & 0x7F)) & 0x7F, over every byte
@@ -27,6 +27,8 @@
     DISCOVER_SERVERS: 0,
     ONLINE_SERVER: 1,
     STATUS: 2,
+    DISCOVER_CLIENTS: 3,
+    ONLINE_CLIENT: 4,
     STORE_HEADER: 10,
     STORE_DATA_BLOCK: 11,
     STORE_BLOCK_ACK: 12,
@@ -37,6 +39,8 @@
     QUERY_REQUEST: 30,
     QUERY_RESULT: 31,
     DELETE_REQUEST: 40,
+    OFFER: 50,
+    OFFER_REPLY: 51,
   };
   const MSG_NAME = {};
   for (const [k, v] of Object.entries(MSG)) MSG_NAME[v] = k;
@@ -47,6 +51,16 @@
   };
   const STATUS_NAME = {};
   for (const [k, v] of Object.entries(STATUS)) STATUS_NAME[v] = k;
+
+  /** MBSP_Offer_Reply Response codes. */
+  const OFFER_RESPONSE = { ACCEPTED: 0, PENDING: 1, DECLINED: 2, BUSY: 3, UNSUPPORTED: 4 };
+  const OFFER_RESPONSE_NAME = {};
+  for (const [k, v] of Object.entries(OFFER_RESPONSE)) OFFER_RESPONSE_NAME[v] = k;
+
+  /** OnlineClient Client Capability Flags (bits 1-6 reserved, sent as 0). */
+  const CLIENT_CAP = {
+    OFFERS: 0x01,          // the Client answers MBSP_Offer
+  };
 
   /** OnlineServer Policy Flags (bits 5-6 reserved, sent as 0). */
   const POLICY_FLAG = {
@@ -304,6 +318,16 @@
       return w.u7(policy & 0x1F).u14(maxStoreBlockSize).u28(Math.min(freeSpace, LIMITS.FREE_SPACE_UNKNOWN)).bytes;
     },
 
+    discoverClients() { return []; },
+
+    onlineClient({ identity, sysexId, deviceName = '', capabilities = 0 }) {
+      return new Writer()
+        .identity(identity)
+        .u7(sysexId ?? LIMITS.SYSEX_ID_NONE)
+        .str(deviceName, 0, LIMITS.DEVICE_NAME_MAX, 'Device Name')
+        .u7(capabilities & 0x7F).bytes;
+    },
+
     status({ requestType, status, recordId = 0 }) {
       return new Writer()
         .u7(requestType).u7(status).u21(recordId).bytes;
@@ -387,6 +411,26 @@
         .identity(identity)
         .u7(sysexId ?? LIMITS.SYSEX_ID_NONE).bytes;
     },
+
+    /** MBSP_Offer: the Server offers a Record to the device(s) with this Target Identity and SysEx ID. */
+    offer(o) {
+      return new Writer()
+        .u21(o.recordId)
+        .identity(o.identity)
+        .u7(o.sysexId ?? LIMITS.SYSEX_ID_NONE)
+        .u7(o.type)
+        .str(o.number, LIMITS.NUMBER_MIN, LIMITS.NUMBER_MAX, 'Payload Number')
+        .str(o.name || '', LIMITS.NAME_MIN, LIMITS.NAME_MAX, 'Payload Name')
+        .u21(o.size).bytes;
+    },
+
+    offerReply({ recordId, response, sysexId, deviceName = '' }) {
+      return new Writer()
+        .u21(recordId)
+        .u7(response)
+        .u7(sysexId ?? LIMITS.SYSEX_ID_NONE)
+        .str(deviceName, 0, LIMITS.DEVICE_NAME_MAX, 'Device Name').bytes;
+    },
   };
 
   // ---------- Payload parsers ----------
@@ -403,6 +447,12 @@
       if (n < 1 || n > LIMITS.VERSIONS_MAX) throw new MbspFieldError(`Number of Supported Versions ${n} not in 1-${LIMITS.VERSIONS_MAX}`);
       const versions = Array.from(r.bytes(n, 'Supported Versions'));
       return { serverName, versions, policy: r.u7('Policy Flags'), maxStoreBlockSize: r.u14('Max Store Block Size'), freeSpace: r.u28('Free Space') };
+    },
+
+    /** Like OnlineServer, bytes after the known fields are ignored (later versions may append fields). */
+    onlineClient(r) {
+      return { identity: r.identity(), sysexId: r.u7('Client Device SysEx ID'), deviceName: r.str(0, LIMITS.DEVICE_NAME_MAX, 'Device Name'),
+        capabilities: r.u7('Client Capability Flags') };
     },
 
     status(r) {
@@ -487,7 +537,37 @@
       const out = { recordId: r.u21('Record ID'), identity: r.identity(), sysexId: r.u7('Device SysEx ID') };
       r.end(); return out;
     },
+
+    offer(r) {
+      const out = {
+        recordId: r.u21('Record ID'), identity: r.identity(), sysexId: r.u7('Target Device SysEx ID'),
+        type: r.u7('Payload Type'), number: r.str(LIMITS.NUMBER_MIN, LIMITS.NUMBER_MAX, 'Payload Number'),
+        name: r.str(LIMITS.NAME_MIN, LIMITS.NAME_MAX, 'Payload Name'), size: r.u21('Payload Size'),
+      };
+      r.end();
+      if (out.recordId < 1) throw new MbspFieldError('Record ID must be 1 or more');
+      return out;
+    },
+
+    offerReply(r) {
+      const out = {
+        recordId: r.u21('Record ID'), response: r.u7('Response'), sysexId: r.u7('Client Device SysEx ID'),
+        deviceName: r.str(0, LIMITS.DEVICE_NAME_MAX, 'Device Name'),
+      };
+      r.end();
+      if (out.response > 4) throw new MbspFieldError(`Response ${out.response} not in 0-4`);
+      return out;
+    },
   };
+
+  /**
+   * Should a Client with this Device Identity and SysEx ID answer an Offer?
+   * The Target Identity must match all 7 bytes; Target SysEx ID 7F means any unit.
+   */
+  function offerIsFor(offer, identity, sysexId) {
+    if (!identityMatches(3, offer.identity, identity)) return false;
+    return offer.sysexId === LIMITS.SYSEX_ID_NONE || offer.sysexId === sysexId;
+  }
 
   // ---------- Matching helpers (shared by the server and the GUI) ----------
 
@@ -537,7 +617,7 @@
 
   Object.assign(MBSP, {
     SYSEX_START, SYSEX_END, HEADER_PREFIX, PROTOCOL_VERSION, MUID_BROADCAST,
-    MSG, MSG_NAME, STATUS, STATUS_NAME, LIMITS, POLICY_FLAG, SUPPORTED_VERSIONS,
+    MSG, MSG_NAME, STATUS, STATUS_NAME, OFFER_RESPONSE, OFFER_RESPONSE_NAME, offerIsFor, CLIENT_CAP, LIMITS, POLICY_FLAG, SUPPORTED_VERSIONS,
     COLLECTION_BIT, CATEGORY_MASK, CATEGORY, CATEGORY_NAME,
     payloadCategory, isCollection, isStorablePayloadType, payloadTypeName,
     MbspFieldError, Writer, Reader,
