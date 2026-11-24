@@ -57,7 +57,20 @@ npm run ports          # list the MIDI ports Node can see
 npm start              # 100 random operations
 ```
 
-The client and server must be connected through a MIDI loopback, so that what one sends the other receives. On Windows, MIDI Services provides loopback pairs. [`sample-client/README.md`](sample-client/README.md) shows the wiring.
+The client and server must be connected through a MIDI loopback, so that what one sends the other receives. On Windows, MIDI Services provides loopback pairs that are cross-wired: whatever is sent on one side arrives on the other.
+
+```mermaid
+flowchart LR
+  C["Studio Client or TouchOSC panel<br/>sends and listens on <b>Loopback (A)</b>"]
+  L(["Windows MIDI Services<br/>loopback pair"])
+  S["MBSP server page in Chrome or Edge<br/>listens and replies on <b>Loopback (B)</b>"]
+  C -- "Requests: out A" --> L
+  L -- "arrive on in B" --> S
+  S -- "Replies: out B" --> L
+  L -- "arrive on in A" --> C
+```
+
+On the server page, enable only `Loopback (B)`, under both Inputs and Outputs. If a second input carries the same traffic, every request arrives twice. Several clients and several server pages (`index.html?instance=A`, `?instance=B`) can share the same pair. [`sample-client/README.md`](sample-client/README.md) has more detail.
 
 ## Tests
 

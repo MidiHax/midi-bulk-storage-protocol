@@ -120,7 +120,7 @@
     <tbody>
       <tr><td>1.0 Draft 1</td><td>2026-11-22</td><td>First draft for MMA review.</td></tr>
       <tr><td>1.0 Draft 2</td><td>2026-11-23</td><td>Clarifications from pre-submission review: two-way MIDI connection and discovery scope, network figure, announcements exempt from C-2, ascending Record IDs, Payload Size field added to Store_Header and Retrieve_Header, Block-count rules, Access Key comparison, MIDI-CI MUID rule, empty Payloads, concurrent replacements, conformance summary, abbreviations, Open Issues 2-4.</td></tr>
-      <tr><td>1.0 Draft 3</td><td>2026-11-24</td><td>Optional client discovery (MBSP_DiscoverClients, MBSP_OnlineClient), so a Server can list the devices present, and optional Offers, with which a Server proposes a Record to a device that fetches it only if it accepts (MBSP_Offer, MBSP_Offer_Reply). Section 6 renumbered so that messages appear in Message Type order. Consistency edits: definition of Request, the Access Key exception for Offers, Clients ignore other Clients' messages (C-2). OnlineClient and Offer_Reply carry Device Name before SysEx ID, as Store_Header does.</td></tr>
+      <tr><td>1.0 Draft 3</td><td>2026-11-24</td><td>Optional client discovery (MBSP_DiscoverClients, MBSP_OnlineClient), so a Server can list the devices present, with a discovery sequence diagram (Figure 2), and optional Offers, with which a Server proposes a Record to a device that fetches it only if it accepts (MBSP_Offer, MBSP_Offer_Reply). Section 6 renumbered so that messages appear in Message Type order. Consistency edits: definition of Request, the Access Key exception for Offers, Clients ignore other Clients' messages (C-2). OnlineClient and Offer_Reply carry Device Name before SysEx ID, as Store_Header does.</td></tr>
     </tbody>
   </table>
 </section>
@@ -750,6 +750,7 @@
 <h2 id="s7"><span class="num">7</span>Procedures</h2>
 
 <h3 id="s7-1"><span class="num">7.1</span>Discovery</h3>
+<figure><svg id="figDiscover"></svg><figcaption>Figure 2. Server discovery answered by two Servers, followed by optional client discovery</figcaption></figure>
 <p>A Client finds Servers by sending DiscoverServers to the broadcast MUID and collecting OnlineServer replies for a short period. A wait of 1 second is <span class="rfc">recommended</span>. Each reply gives a Server's MUID (its Source MUID) and its name. A Client <span class="rfc">may</span> also learn of Servers from announcements, which it <span class="rfc">may</span> use at any time (C-2).</p>
 <p>Servers draw a new MUID at power-up (Section 5.5), so a Client <span class="rfc">shall</span> discover the Server it uses before its first Request after the Client powers up, even when it has been configured with a Server Name. It <span class="rfc">should</span> discover again when a Server it was using stops answering, which usually means the Server has restarted with a new MUID. It <span class="rfc">should</span> also follow a Server that announces a new MUID with OnlineServer under the same name.</p>
 <p>If several Servers answer with the same name, a Client <span class="rfc">shall not</span> choose one of them automatically. It <span class="rfc">should</span> tell its user, who can rename one of them, and <span class="rfc">may</span> let the user choose between them by other details, such as their policies.</p>
@@ -764,7 +765,7 @@
 <p>Client discovery adds no state that any Request depends on. A Server that loses its device list, or never builds one, still answers every Request correctly.</p>
 
 <h3 id="s7-2"><span class="num">7.2</span>Store</h3>
-<figure><svg id="figStore"></svg><figcaption>Figure 2. A successful Store of a Payload in three Blocks, with flow control</figcaption></figure>
+<figure><svg id="figStore"></svg><figcaption>Figure 3. A successful Store of a Payload in three Blocks, with flow control</figcaption></figure>
 <ol>
   <li>The Client sends Store_Header and waits. The Server replies with Store_Block_Ack (Next Block Index 0), or with a Status if it cannot accept the Store. A Server that knows it cannot hold Payload Size more bytes <span class="rfc">should</span> reply Storage Full (6) at once, before any Block is sent.</li>
   <li>The Client sends each Block only when the Server asks for it, in Block Index order. The Server acknowledges every Block except the last (Section 7.4).</li>
@@ -794,7 +795,7 @@
 <p>A Block for a Store that is neither open nor remembered is answered with Unknown Transaction (9). A Client that receives this after resending its last Block cannot tell whether the Store succeeded, for example because the Server restarted. It <span class="rfc">may</span> Query the Server to find out, or store the Payload again.</p>
 
 <h3 id="s7-3"><span class="num">7.3</span>Retrieve</h3>
-<figure><svg id="figRetrieve"></svg><figcaption>Figure 3. Retrieve of a Record returned in three Blocks, with flow control</figcaption></figure>
+<figure><svg id="figRetrieve"></svg><figcaption>Figure 4. Retrieve of a Record returned in three Blocks, with flow control</figcaption></figure>
 <p>The Server chooses a Block size no larger than the Client's Max Block Size (when given) and no larger than its own limit, and sends Retrieve_Header. The Client answers with Retrieve_Block_Ack (Next Block Index 0) when it is ready, and the Server then sends each Block only when the Client asks for it. The Client's ack after the last Block (Next Block Index = NumBlocks) tells the Server that the transfer is complete. An empty Payload is sent as one Block of size 0. If the Payload cannot be sent in 16,383 Blocks of the Client's Max Block Size, the Server replies Invalid Request (8).</p>
 <p>Retrieve_Header gives the Payload Size before any Block is sent, so a Client can check that the Payload fits in its memory. A Client that cannot accept it does not acknowledge the header. The Server's retries then end the Transaction.</p>
 <p>The Client reassembles the Blocks and checks that they add up to the Payload Size and match the Full Payload Checksum. If either check fails, or the transfer fails after the retries of Section 7.4, the Client discards the data and <span class="rfc">may</span> send a new Retrieve_Request with a new Transaction ID. If the Server gives up after its retries, it sends Status Transaction Timeout (5) with Request Message Type 20.</p>
@@ -819,7 +820,7 @@
 <p>The Server's pause between Query_Results (S-8) is a courtesy that eases bursts on slow links. Clients <span class="rfc">shall not</span> rely on it, because results may arrive back to back, particularly over USB.</p>
 
 <h3 id="s7-5"><span class="num">7.5</span>Query and Paging</h3>
-<figure><svg id="figQuery"></svg><figcaption>Figure 4. A Query returning the first page of three results out of 40 matches</figcaption></figure>
+<figure><svg id="figQuery"></svg><figcaption>Figure 5. A Query returning the first page of three results out of 40 matches</figcaption></figure>
 <p>The Server orders matching Records by ascending Record ID, so that pages stay consistent between Requests, and returns the matches from Start Index up to Max Results. The Client knows the page is complete when it has received the Result with</p>
 <pre class="bytes">Result Index = min(Start Index + Max Results, Total Matches) - 1</pre>
 <p>To read the next page, the Client sends a new Query_Request with Start Index advanced by the number of results received. If a Result Index is missing when the Client's reply wait ends, a Query_Result was lost: the Client <span class="rfc">may</span> send the same Query_Request again (with a new Transaction ID) and keep the results it is missing. Because Records are listed in ascending Record ID order and new Records always receive higher Record IDs (Section 5.6), Records stored during paging appear only after the existing ones, and a replaced Record keeps its position. Only a Record deleted from an earlier page shifts the pages that follow, which can make a Client skip one Record. A Server <span class="rfc">shall</span> reply with Status Not Found (1) when no Record falls in the requested page, and <span class="rfc">shall not</span> send a Query_Result whose Result Index would exceed 16,383.</p>
@@ -828,7 +829,7 @@
 <p>The Client sends Delete_Request with the Record ID and its own Device Identity and SysEx ID. The Server replies with Status OK, Not Found, or Refused. A Server <span class="rfc">may</span> refuse every Delete (for example an archival or read-only Server), and <span class="rfc">may</span> refuse a Delete that does not come from the Record's Owner (Section 8.4).</p>
 
 <h3 id="s7-7"><span class="num">7.7</span>Offer</h3>
-<figure><svg id="figOffer"></svg><figcaption>Figure 5. An Offer that the device's user accepts, followed by an ordinary Retrieve</figcaption></figure>
+<figure><svg id="figOffer"></svg><figcaption>Figure 6. An Offer that the device's user accepts, followed by an ordinary Retrieve</figcaption></figure>
 <p>Offers let the user of a Server send a Record to a device: for example, to load a patch into an instrument from a librarian-style screen on the Server, without operating the instrument's own controls. Offers are optional for Servers and for Clients. A Client that does not implement them ignores MBSP_Offer like any Message Type it does not implement (Section 4.8), so the Server receives no reply.</p>
 <ol>
   <li>The Server sends Offer to the broadcast MUID, or to the MUID of one Client, for example one from its device list (Section 7.1), naming the Record and the target device.</li>
@@ -1178,7 +1179,7 @@
 
 <script>
   // ---- Sequence diagrams (drawn before printing) ----
-  function seq(id, steps) {
+  function seq(id, steps, lanes = ['Client', 'Server']) {
     const W = 640, top = 46, row = 30, cx = 150, sx = 490;
     const svg = document.getElementById(id);
     const H = top + steps.length * row + 16;
@@ -1195,7 +1196,7 @@
     const m = document.createElementNS(ns, 'marker');
     for (const [k, v] of Object.entries({ id: id + 'a', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' })) m.setAttribute(k, v);
     const p = document.createElementNS(ns, 'path'); p.setAttribute('d', 'M0 0 L10 5 L0 10 z'); p.setAttribute('fill', '#1a1a1a'); m.appendChild(p); defs.appendChild(m);
-    for (const [x, label] of [[cx, 'Client'], [sx, 'Server']]) {
+    for (const [x, label] of [[cx, lanes[0]], [sx, lanes[1]]]) {
       el('rect', { x: x - 55, y: 6, width: 110, height: 24, fill: '#e8e8e8', stroke: '#1a1a1a', 'stroke-width': 1 });
       el('text', { x, y: 22, 'text-anchor': 'middle', 'font-family': 'Segoe UI, Arial, sans-serif', 'font-size': 12, 'font-weight': 600 }, label);
       el('line', { x1: x, y1: 30, x2: x, y2: H - 6, stroke: '#888', 'stroke-width': 1, 'stroke-dasharray': '4 3' });
@@ -1211,6 +1212,15 @@
       el('text', { x: (cx + sx) / 2, y: y - 5, 'text-anchor': 'middle', 'font-family': 'Consolas, monospace', 'font-size': 11 }, s.label);
     });
   }
+  seq('figDiscover', [
+    { dir: 'C', label: 'DiscoverServers  (to broadcast, TID 1)' },
+    { dir: 'S', label: 'OnlineServer  ("StudioVault", TID 1)', dashed: true },
+    { dir: 'S', label: 'OnlineServer  ("Vault-2", TID 1)', dashed: true },
+    { note: 'After 1 s the Client knows each Server\'s MUID, name and policies' },
+    { note: 'Optional: a Server discovers Clients, with a TID it chooses' },
+    { dir: 'S', label: 'DiscoverClients  (to broadcast, TID 2)', dashed: true },
+    { dir: 'C', label: 'OnlineClient  (Identity, Name, TID 2)' },
+  ], ['Client', 'Servers']);
   seq('figStore', [
     { dir: 'C', label: 'Store_Header  (NumBlocks = 3, TID 7)' },
     { dir: 'S', label: 'Store_Block_Ack  (next 0)', dashed: true },
