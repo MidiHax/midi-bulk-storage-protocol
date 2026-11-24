@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Emulates a studio of 10 MIDI devices that exercise an MBSP server over MIDI",
+  "license": "MIT",
   "main": "mbsp-studio.js",
   "scripts": {
     "start": "node mbsp-studio.js",

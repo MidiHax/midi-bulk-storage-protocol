@@ -323,8 +323,8 @@
     onlineClient({ identity, sysexId, deviceName = '', capabilities = 0 }) {
       return new Writer()
         .identity(identity)
-        .u7(sysexId ?? LIMITS.SYSEX_ID_NONE)
         .str(deviceName, 0, LIMITS.DEVICE_NAME_MAX, 'Device Name')
+        .u7(sysexId ?? LIMITS.SYSEX_ID_NONE)
         .u7(capabilities & 0x7F).bytes;
     },
 
@@ -428,8 +428,8 @@
       return new Writer()
         .u21(recordId)
         .u7(response)
-        .u7(sysexId ?? LIMITS.SYSEX_ID_NONE)
-        .str(deviceName, 0, LIMITS.DEVICE_NAME_MAX, 'Device Name').bytes;
+        .str(deviceName, 0, LIMITS.DEVICE_NAME_MAX, 'Device Name')
+        .u7(sysexId ?? LIMITS.SYSEX_ID_NONE).bytes;
     },
   };
 
@@ -451,8 +451,9 @@
 
     /** Like OnlineServer, bytes after the known fields are ignored (later versions may append fields). */
     onlineClient(r) {
-      return { identity: r.identity(), sysexId: r.u7('Client Device SysEx ID'), deviceName: r.str(0, LIMITS.DEVICE_NAME_MAX, 'Device Name'),
-        capabilities: r.u7('Client Capability Flags') };
+      const identity = r.identity();
+      const deviceName = r.str(0, LIMITS.DEVICE_NAME_MAX, 'Device Name');
+      return { identity, deviceName, sysexId: r.u7('Client Device SysEx ID'), capabilities: r.u7('Client Capability Flags') };
     },
 
     status(r) {
@@ -551,8 +552,8 @@
 
     offerReply(r) {
       const out = {
-        recordId: r.u21('Record ID'), response: r.u7('Response'), sysexId: r.u7('Client Device SysEx ID'),
-        deviceName: r.str(0, LIMITS.DEVICE_NAME_MAX, 'Device Name'),
+        recordId: r.u21('Record ID'), response: r.u7('Response'),
+        deviceName: r.str(0, LIMITS.DEVICE_NAME_MAX, 'Device Name'), sysexId: r.u7('Client Device SysEx ID'),
       };
       r.end();
       if (out.response > 4) throw new MbspFieldError(`Response ${out.response} not in 0-4`);

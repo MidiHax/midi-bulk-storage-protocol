@@ -80,3 +80,7 @@ node build-pdf.js
 ## Feedback
 
 Comments on the protocol are welcome. Please open an issue.
+
+## License
+
+The reference implementations in this repository are released under the [MIT License](LICENSE). The specification is a draft proposal to the MMA and AMEI.

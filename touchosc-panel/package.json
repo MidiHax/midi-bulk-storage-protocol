@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "TouchOSC demo panel that saves and restores control snapshots on MBSP servers",
+  "license": "MIT",
   "scripts": {
     "build": "node build-panel.js",
     "test": "node build-panel.js && node test/run-panel-test.js"

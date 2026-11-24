@@ -433,8 +433,8 @@ local function offerReply(o, response)
   local p = {}
   putN(p, o.recordId, 3)
   put(p, response)
-  put(p, 0x7F)                                -- no SysEx ID
   putStr(p, DEVICE_NAME)
+  put(p, 0x7F)                                -- no SysEx ID
   send(MSG.OFFER_REPLY, o.srv.muid, o.tid, p)
 end
 
@@ -442,8 +442,8 @@ end
 local function announce(dst, tid)
   local p = {}
   for i = 1, 7 do put(p, IDENTITY[i]) end
-  put(p, 0x7F)                                -- no SysEx ID
   putStr(p, DEVICE_NAME)
+  put(p, 0x7F)                                -- no SysEx ID
   put(p, 1)                                   -- Client Capability Flags: bit 0, accepts Offers
   send(MSG.ONLINE_CLIENT, dst or BROADCAST, tid or 0, p)
 end
